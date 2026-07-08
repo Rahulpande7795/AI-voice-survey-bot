@@ -1,78 +1,59 @@
-# 🎙 AI Voice Survey V4 — Twilio + Local Whisper
+# 🎙 AI Voice Survey Bot — L&T Finance
 
-> Real-time Hindi/Hinglish payment verification bot for L&T Finance.
-> V4 adds local faster-whisper STT, Silero VAD, edge-tts, and Twilio Media Streams for real outbound phone calls.
+A real-time Hindi/Hinglish voice bot built for automated payment verification calls at L&T Finance. The bot calls customers, asks about their EMI payment status, extracts structured data (date, amount, payment method, payer), and routes through a 12-node call script.
 
----
-
-## What Changed in V4
-
-V3 worked well in the browser but still relied on Groq cloud for STT (300–700ms India→US round-trip) and gTTS for speech output. V4 addresses both:
-
-| Component | V3 | V4 |
-|-----------|----|----|
-| STT | Groq Whisper (cloud, 300–700ms) | faster-whisper tiny (local CPU, <50ms) |
-| VAD | Energy threshold | Silero-VAD (neural, 512-sample frames) |
-| TTS | gTTS (Google, ~200ms) | edge-tts (Microsoft Neural, en-IN-NeerjaNeural) |
-| Phone calls | Browser only | Twilio Media Streams (real outbound calls) |
-| TTS cache | 13 phrases | 68 phrases (pre-warmed at startup) |
-| Decision latency | ~400ms (intent path) | ~300ms (intent path, no STT network hop) |
+Built iteratively over 4 versions during my internship — starting from a 6.5s REST pipeline and ending at a <300ms Twilio-integrated system that runs on real phone calls.
 
 ---
 
-## Architecture
+## The Problem
 
-### Decision pipeline (per turn)
+L&T Finance needed to automate outbound payment verification calls in Hindi. A human agent would call a customer, ask a series of structured questions, and log the responses. The goal was to replicate this with an AI voice bot that:
 
-```
-User speaks → VAD detects end-of-speech → faster-whisper STT
-      │
-      ├─ Layer 1: extractor.py    always runs · extracts date/amount/method/payer
-      ├─ Layer 2: intent.py       regex classifier · <1ms · ~80% of turns
-      ├─ Layer 3: cache.py        FAISS + exact-match · ~3ms · ~15% of turns
-      └─ Layer 4: llm_stream.py   Groq Llama fallback · ~1300ms · ~5% of turns
-```
+- Speaks natural Hindi to customers
+- Understands spoken responses (including variations, accents, Hindi/English mix)
+- Follows a branching call script depending on answers
+- Extracts and logs structured data at the end of each call
 
-### Twilio call flow
-
-```
-Caller dials +18782830614
-    │
-    ▼ Twilio POST → /incoming-call
-Server returns TwiML (connects WebSocket to /twilio-ws)
-    │
-    ▼ Twilio opens WebSocket
-Server plays intro + first question (edge-tts → mulaw → Twilio)
-    │
-    ▼ Caller speaks
-mulaw 8kHz packets → VAD → upsample to 16kHz → faster-whisper
-    │
-    ▼ Transcript
-intent/cache/LLM pipeline → edge-tts → mulaw → Twilio → caller hears response
-```
-
-### Audio format conversion (Twilio path)
-
-- **Incoming:** mulaw G.711 8kHz → `audioop.ulaw2lin()` → int16 PCM → upsample → float32 16kHz → Whisper
-- **Outgoing:** edge-tts MP3 → pydub decode → int16 8kHz → `audioop.lin2ulaw()` → base64 JSON → Twilio
+The engineering challenge: doing all of this fast enough to feel like a real conversation. Early versions took 6+ seconds per response turn. The final version handles structured responses in under 300ms.
 
 ---
 
-## Performance (measured)
+## Latency Evolution
 
-> faster-whisper runs locally — no India→US STT round-trip
+> Measured from India → Groq US servers, no GPU
 
-| Turn type | Pipeline | Notes |
-|-----------|----------|-------|
-| Intent hit (~80%) | 12–23ms | no network call at all |
-| Cache hit (~15%) | 3–5ms | FAISS lookup only |
-| LLM fallback (~5%) | ~1300ms | Groq round-trip from India |
+| Version | What it introduced | Turn latency |
+|---------|-------------------|-------------|
+| **V1** | REST pipeline, Deepgram STT, GPT-4o, ElevenLabs TTS | 5000–6500ms |
+| **V2** | WebSocket, Groq Whisper STT, streaming LLM, gTTS cache | 1800–3000ms |
+| **V3** | Intent classifier + FAISS semantic cache + Hindi L&T script | ~400ms (intent path) |
+| **V4** | Local faster-whisper + Silero VAD + edge-tts + Twilio phone calls | ~300ms (intent path) |
 
-**TTS cache:** 68 phrases pre-warmed at startup → ack latency 3–5ms (was up to 1650ms in V3 for dynamic phrases)
+The 16× improvement from V1 → V4 on structured responses (yes/no/numeric) comes from three compounding decisions: switching from cloud to local STT, adding a regex classifier that bypasses the LLM for ~80% of turns, and pre-warming a 68-phrase TTS cache so audio synthesis costs 3–5ms instead of 200–1650ms.
 
 ---
 
-## Survey Call Script (12 nodes)
+## Architecture (V4 — current)
+
+### Decision pipeline per turn
+
+```
+User speaks
+    │
+    ▼ Silero VAD detects end-of-speech
+    │
+    ▼ faster-whisper (local CPU, <50ms)
+    │
+    ├─ Layer 1: extractor.py    always runs · extracts date/amount/method/payer from text
+    ├─ Layer 2: intent.py       regex classifier · <1ms · handles ~80% of turns
+    ├─ Layer 3: cache.py        FAISS + exact-match · ~3ms · handles ~15% of turns
+    └─ Layer 4: llm_stream.py   Groq Llama 3.1 8B · ~1300ms · only ~5% of turns
+```
+
+The key insight: for a payment verification call, most answers are predictable — "haan", "nahi", "UPI se", "15 tarikh ko". The regex classifier catches all of these in under 1ms with zero network cost. The LLM only runs for genuinely free-text responses like reasons for non-payment.
+
+### L&T Finance call script (12 nodes)
 
 ```
 INTRO
@@ -89,122 +70,145 @@ INTRO
           └────────────────────────→ DATE → METHOD → AMOUNT → CLOSE
 ```
 
-**Structured data extracted per call:**
+### Two delivery channels
 
-| Node | Field | Example |
-|------|-------|---------|
-| `DATE` | `payment_date` | `"15/04"` |
-| `AMOUNT` | `payment_amount` | `5000` |
-| `METHOD` | `payment_method` | `"upi"` |
-| `WHO_PAID` | `payer` | `"self"` / `"spouse"` |
-| `REASON` | `nonpayment_reason` | `"financial_hardship"` |
+**Browser** — works at `http://localhost:8000`. Useful for demos, testing, and the early versions.
 
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| ASR | faster-whisper tiny (CPU int8) |
-| VAD | silero-vad (512-sample frame chunking) |
-| LLM | Groq llama-3.1-8b-instant (streaming) |
-| TTS | edge-tts en-IN-NeerjaNeural (68-phrase LRU cache) |
-| Semantic cache | faiss-cpu + all-MiniLM-L6-v2 (threshold 0.75) |
-| Backend | FastAPI + uvicorn (WebSocket, asyncio) |
-| Phone | Twilio Media Streams |
-| Tunnel | pyngrok (static ngrok domain) |
-
----
-
-## File Structure
+**Phone (Twilio)** — real outbound calls via Twilio Media Streams. The server bridges mulaw 8kHz audio from Twilio into the same STT → intent/cache/LLM → TTS pipeline, then re-encodes the response back to mulaw for Twilio to deliver to the caller.
 
 ```
-voice-survey-v4/
-├── start_with_tunnel.py        ← one-command launcher (ngrok + server)
-├── .env.example
-├── requirements.txt
-├── ARCHITECTURE.md             ← detailed system design and config notes
-├── BUG_FIX_REPORT.md           ← 6 bugs fixed in this version
-├── FIXES_REPORT.md             ← browser-side fixes (VAD, race conditions, PCM)
-├── TWILIO_FIXES_REPORT.md      ← Twilio integration fixes
-├── TWILIO_SETUP.md             ← step-by-step Twilio Console guide
-├── PHONE_TEST_REPORT.md        ← integration test results
-└── server/
-    ├── main.py                 ← FastAPI app, WebSocket routes, /health endpoint
-    ├── pipeline.py             ← survey orchestrator, run_turn()
-    ├── stt_stream.py           ← faster-whisper + Silero VAD
-    ├── tts_stream.py           ← edge-tts, 68-phrase LRU cache
-    ├── cache.py                ← FAISS semantic cache + exact-match dict
-    ├── intent.py               ← regex intent classifier
-    ├── extractor.py            ← structured field extraction
-    ├── llm_stream.py           ← Groq streaming
-    ├── survey_engine.py        ← 12-node L&T Finance call script
-    ├── context.py              ← per-session state
-    ├── config.py               ← all model/VAD/cache config
-    ├── twilio_handler.py       ← Twilio Media Streams handler
-    └── make_call.py            ← trigger an outbound call
+Caller dials → Twilio POST → /incoming-call → TwiML
+    │
+    ▼ Twilio opens WebSocket to /twilio-ws
+    │
+mulaw 8kHz audio packets
+    │
+    ▼ audioop.ulaw2lin() → upsample to 16kHz → faster-whisper
+    │
+    ▼ intent/cache/LLM pipeline
+    │
+    ▼ edge-tts MP3 → pydub decode → int16 8kHz → audioop.lin2ulaw() → Twilio
 ```
 
 ---
 
-## Setup
+## Version Breakdown
 
-### Prerequisites
-- Python 3.10+
-- [Groq API key](https://console.groq.com) (free tier sufficient)
-- Twilio account with a phone number (for phone calls)
-- ngrok account (free tier, static domain optional)
-- No GPU required
+### V1 — Proof of Concept
+**[`voice-survey-v1/`](./voice-survey-v1)**
 
-### Install
+```
+Browser → REST → Deepgram STT → REST → GPT-4o → REST → ElevenLabs TTS → Browser
+```
+
+Three sequential REST calls per turn. Deepgram from India alone took 2.5–4s. The goal was just to prove the full pipeline worked end-to-end — 5 fixed questions, no branching, English only.
+
+Stack: Deepgram Nova-2 · GPT-4o · ElevenLabs · FastAPI REST
+
+---
+
+### V2 — WebSocket + Streaming
+**[`voice-survey-v2/`](./voice-survey-v2)**
+
+Replaced the three REST calls with one persistent WebSocket connection. Switched Deepgram → Groq Whisper (same API key as the LLM, 216× real-time speed, 300–700ms from India vs 2.5–4s). Added LLM token streaming so responses appear on screen as they generate. Added a dynamic branching survey tree.
+
+Key bug fixed: browser `MediaRecorder` emits the WebM EBML header (`1A 45 DF A3`) only once — on session reconnect, subsequent recordings send headerless blobs that every STT API rejects with `400`. `AudioCollector` scans each chunk for the magic bytes and drops pre-header data silently.
+
+Stack: Groq Whisper v3-Turbo · Groq Llama 3.1 8B · gTTS (cached) · FastAPI WebSocket
+
+---
+
+### V3 — Intent Cache + Hindi + L&T Finance
+**[`voice-survey-v3/`](./voice-survey-v3)**
+
+The first version built specifically for L&T Finance. Replaced the generic survey with a 12-node Hindi payment verification call script. Added two layers before the LLM: a local regex intent classifier (<1ms, handles yes/no/numeric/UPI/dates) and a FAISS semantic cache using `all-MiniLM-L6-v2` embeddings (catches paraphrases like "haan bilkul" = "ji haan" at cosine similarity 0.85).
+
+Also added sentence-level TTS streaming — instead of waiting for the full LLM response before synthesising audio, TTS fires as an `asyncio.Task` at each sentence boundary. First audio arrives 200–400ms earlier.
+
+Stack: Groq Whisper (Hindi) · Groq Llama 3.1 8B · FAISS · sentence-transformers · gTTS (Hindi) · FastAPI WebSocket
+
+---
+
+### V4 — Twilio + Local Whisper (current)
+**[`voice-survey-v4/`](./voice-survey-v4)**
+
+Replaced cloud STT with local `faster-whisper tiny` (CPU int8) — eliminates the India→US STT round-trip entirely. Replaced energy VAD with Silero-VAD (neural, 512-sample frame chunking). Replaced gTTS with `edge-tts` (Microsoft Neural, `en-IN-NeerjaNeural`). Added Twilio Media Streams integration for real outbound phone calls.
+
+Notable bugs fixed in V4: Silero-VAD was silently falling back to energy VAD because the code passed 16000-sample windows instead of 512-sample frames; a race condition between VAD and `audio_end` was firing the pipeline twice per turn; dynamic f-string TTS acks were causing 1650ms spikes that are now replaced with static cached phrases.
+
+Stack: faster-whisper tiny · Silero-VAD · Groq Llama 3.1 8B · FAISS · edge-tts · Twilio Media Streams · FastAPI WebSocket
+
+---
+
+## Repo Structure
+
+```
+ai-voice-survey-bot/
+├── voice-survey-v1/          ← REST proof of concept
+│   ├── server/               (main.py, stt.py, llm.py, tts.py)
+│   ├── client/index.html
+│   └── README.md
+│
+├── voice-survey-v2/          ← WebSocket + streaming LLM
+│   ├── server/               (main.py, pipeline.py, stt_stream.py, ...)
+│   ├── client/index.html
+│   └── README.md
+│
+├── voice-survey-v3/          ← Intent cache + Hindi + L&T Finance
+│   ├── server/               (+ intent.py, cache.py, extractor.py)
+│   ├── client/index.html
+│   ├── .env.example
+│   └── README.md
+│
+└── voice-survey-v4/          ← Twilio + local Whisper (production)
+    ├── server/               (+ twilio_handler.py, config.py, make_call.py)
+    ├── client/index.html
+    ├── start_with_tunnel.py  ← one-command launcher (ngrok + server)
+    ├── ARCHITECTURE.md       ← detailed system design and config notes
+    ├── BUG_FIX_REPORT.md
+    ├── FIXES_REPORT.md
+    ├── TWILIO_FIXES_REPORT.md
+    ├── TWILIO_SETUP.md
+    ├── PHONE_TEST_REPORT.md
+    ├── .env.example
+    └── README.md
+```
+
+Each version folder has its own README with setup instructions and architecture details.
+
+---
+
+## Quick Start (V4)
 
 ```bash
-cd voice-survey-v4
+git clone https://github.com/Rahulpande7795/ai-voice-survey-bot.git
+cd ai-voice-survey-bot/voice-survey-v4
 
 python -m venv .venv
 .venv\Scripts\activate        # Windows
 # source .venv/bin/activate   # Linux/Mac
 
 pip install -r requirements.txt
-```
 
-### Configure
-
-```bash
 cp .env.example .env
+# Fill in GROQ_API_KEY (required), Twilio keys (for phone calls), ngrok token
 ```
 
-Fill in `.env`:
-```env
-GROQ_API_KEY=gsk_your_key_here
-
-# Twilio (required for phone calls)
-TWILIO_ACCOUNT_SID=your_sid
-TWILIO_AUTH_TOKEN=your_token
-TWILIO_PHONE_NUMBER=+1xxxxxxxxxx
-
-# ngrok
-NGROK_AUTH_TOKEN=your_ngrok_token
-NGROK_STATIC_DOMAIN=your-static-domain.ngrok-free.dev   # optional but recommended
-```
-
-### Run (browser mode)
-
+**Browser mode:**
 ```bash
 cd server
 uvicorn main:app --reload --port 8000
+# Open http://localhost:8000
 ```
 
-Open `http://localhost:8000` in Chrome/Edge.
-
-### Run (with Twilio phone calls)
-
+**Phone call mode:**
 ```bash
-# From project root — starts ngrok tunnel + server together
 python start_with_tunnel.py
+# Starts ngrok tunnel + server together
+# Set the printed webhook URL in Twilio Console once
 ```
 
-Wait for all four startup lines before testing:
+Wait for all four startup lines:
 ```
 STT  ✔  whisper-tiny ready
 CACHE ✔  model loaded  threshold=0.75
@@ -212,59 +216,66 @@ TTS  ✔  cache warm — 68 phrases ready
 V4 ready  →  http://localhost:8000
 ```
 
-Then set the Twilio Console webhook to the ngrok URL printed in the terminal. See `TWILIO_SETUP.md` for the full guide.
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GROQ_API_KEY` | — | **Required** for LLM fallback |
-| `CACHE_THRESHOLD` | `0.75` | Semantic similarity cutoff (0.0–1.0) |
-| `TWILIO_ACCOUNT_SID` | — | Required for phone calls |
-| `TWILIO_AUTH_TOKEN` | — | Required for phone calls |
-| `TWILIO_PHONE_NUMBER` | — | Your Twilio number |
-| `NGROK_AUTH_TOKEN` | — | Required for `start_with_tunnel.py` |
-| `NGROK_STATIC_DOMAIN` | — | Optional — prevents URL changing on restart |
+See [`voice-survey-v4/TWILIO_SETUP.md`](./voice-survey-v4/TWILIO_SETUP.md) for the full phone call setup.
 
 ---
 
-## Startup Log (expected)
+## Tech Stack Across Versions
 
-```
-STT  ✔  silero-vad ready  883ms
-STT  ✔  whisper-tiny ready  17070ms
-STT  ✔  model pre-warmed
-CACHE ✔  model loaded  all-MiniLM-L6-v2  threshold=0.75
-TTS  ▶  warming 68 phrases  voice=en-IN-NeerjaNeural…
-TTS  ✔  cache warm — 68 phrases ready  (2049 KB total)
-V4 ready  →  http://localhost:8000
-```
-
-Model warmup takes ~1 minute on first run. Subsequent runs are faster since faster-whisper caches weights to disk.
-
----
-
-## Key Bugs Fixed in V4
-
-Full details in `BUG_FIX_REPORT.md` and `FIXES_REPORT.md`. Short list:
-
-- **Silero VAD 512-sample frame fix** — was passing 16000 samples, caused `ValueError` on every call, fell back silently to energy VAD
-- **Race condition: VAD + audio_end double-firing** — added `asyncio.Lock()` per session
-- **AMOUNT/DATE/METHOD TTS spike** — dynamic f-string acks (1650ms) replaced with static cached phrases (3–5ms)
-- **Raw PCM odd-byte crash** — `np.frombuffer` on odd-length byte array, fixed by trimming to even
-- **Whisper hallucination on silence** — added `_is_hallucination()` filter + `no_speech_threshold=0.6`
-- **Twilio `PUBLIC_URL` stale read** — `config.py` frozen at import time, fixed to `os.getenv()` per request
+| Layer | V1 | V2 | V3 | V4 |
+|-------|----|----|----|----|
+| Transport | REST | WebSocket | WebSocket | WebSocket + Twilio |
+| STT | Deepgram Nova-2 | Groq Whisper | Groq Whisper (Hindi) | faster-whisper (local) |
+| VAD | — | Energy | Energy | Silero-VAD |
+| LLM | GPT-4o | Groq Llama 3.1 8B | Groq Llama 3.1 8B | Groq Llama 3.1 8B |
+| Intent | — | Survey engine | Regex classifier | Regex classifier |
+| Semantic cache | — | — | FAISS + MiniLM | FAISS + MiniLM |
+| TTS | ElevenLabs | gTTS + cache | gTTS + cache (Hindi) | edge-tts + 68-phrase cache |
+| Phone | — | — | — | Twilio Media Streams |
+| Language | English | English | Hindi / Hinglish | Hindi / Hinglish |
 
 ---
 
-## Packages
+## Key Engineering Decisions
+
+**Groq Whisper over Deepgram** — 216× real-time processing speed, same `GROQ_API_KEY` as the LLM, Hindi support, and 300–700ms from India vs 2.5–4s for Deepgram. The bottleneck with Deepgram wasn't processing speed — it was geography.
+
+**Intent classifier before LLM** — ~80% of payment call answers are structured (yes/no, UPI, a date, a number). A regex classifier handles all of these in <1ms with zero network cost. This is the single biggest latency win across the project.
+
+**FAISS over key-value cache** — spoken language varies. "Haan bilkul", "ji haan", "ho gaya" all mean yes. Exact-match caching misses all of them. `all-MiniLM-L6-v2` + FAISS cosine similarity at 0.75–0.85 threshold catches paraphrases reliably.
+
+**Split TTS calls** — combining `ack_text + " " + next_question` into one call sounds natural but the string never hits the cache (ack text is unique LLM output). Splitting means the fixed survey question always hits the pre-warmed cache in <15ms.
+
+**Local faster-whisper** — eliminates the India→US STT network hop entirely. `whisper-tiny` on CPU runs in <50ms for short utterances. The dangerous models guard in `stt_stream.py` prevents accidentally loading `large-v3-turbo` on CPU (10+ minute load, likely OOM).
+
+---
+
+## Performance Summary
 
 ```
-fastapi · uvicorn[standard] · groq · edge-tts · faster-whisper
-faiss-cpu · sentence-transformers · numpy · torch · torchaudio
-PyAV · pydub · python-dotenv · websockets · soundfile
-twilio · pyngrok · audioop-lts
+V1 — REST pipeline:
+  Total per turn:    5000–6500ms
+
+V2 — WebSocket + Groq Whisper:
+  Total per turn:    1800–3000ms   (~3× faster)
+
+V3 — Intent classifier + FAISS cache:
+  Intent hit:        ~400ms        (~15× faster than V1)
+  Cache hit:         ~500ms
+  LLM fallback:      1800–2500ms
+
+V4 — Local STT + Twilio:
+  Intent hit:        ~300ms        (~20× faster than V1)
+  Cache hit:         ~175ms
+  LLM fallback:      ~500ms
 ```
+
+---
+
+## Links
+
+- **GitHub:** [github.com/Rahulpande7795](https://github.com/Rahulpande7795)
+- **LinkedIn:** [linkedin.com/in/rahul-pande-dev](https://linkedin.com/in/rahul-pande-dev)
 
 ---
 

@@ -1,0 +1,68 @@
+# ── Python ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Virtual environments ─────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Environment / secrets ────────────────────────────────
+.env
+!.env.example
+
+# ── ML model caches ──────────────────────────────────────
+.torch_hub_cache/
+whisper_models/
+*.pt
+*.bin
+*.onnx
+
+# ── Scratch / debug files (v4) ───────────────────────────
+scratch_*.py
+*_debug*.py
+*_debug_v*.py
+temp.tldr
+
+# ── Benchmark scripts (internal, not useful publicly) ────
+benchmark_*.py
+bench_*.py
+
+# ── Test / audio generation helpers ─────────────────────
+generate_test_audio.py
+gen_speech_test_audio.py
+gen_test_audio.py
+test_whisper.py
+test_hallucination.py
+quick_stt_test.py
+test_stt_accuracy.py
+test_stt_via_server.py
+e2e_latency_test.py
+live_test_client.py
+phase1_checks.ps1
+
+# ── Test audio files ─────────────────────────────────────
+server/test_audio/
+*.wav
+*.mp3
+*.ogg
+*.webm
+
+# ── OS junk ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ──────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo

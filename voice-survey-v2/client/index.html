@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Voice Survey · V2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+/* ── Reset & tokens ─────────────────────────────────────────────────────── */
+:root{
+  --bg:        #07080c;
+  --surface:   #0d0f18;
+  --surface2:  #12141f;
+  --border:    #1a1e2e;
+  --border2:   #222740;
+  --accent:    #6366f1;
+  --a-soft:    rgba(99,102,241,.13);
+  --a-glow:    rgba(99,102,241,.22);
+  --teal:      #2dd4bf;
+  --t-soft:    rgba(45,212,191,.12);
+  --t-glow:    rgba(45,212,191,.2);
+  --red:       #f87171;
+  --r-soft:    rgba(248,113,113,.1);
+  --green:     #4ade80;
+  --amber:     #fbbf24;
+  --text:      #dde1f0;
+  --text2:     #7b849e;
+  --text3:     #30384f;
+  --r:         16px;
+  --r-sm:      10px;
+  --ff:        'DM Sans',system-ui,sans-serif;
+  --ffm:       'DM Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+
+body{
+  min-height:100vh;
+  background:var(--bg);
+  background-image:
+    radial-gradient(ellipse 80% 40% at 50% -8%, rgba(99,102,241,.11) 0%,transparent 70%),
+    radial-gradient(ellipse 40% 30% at 90% 90%,  rgba(45,212,191,.06) 0%,transparent 60%);
+  color:var(--text);
+  font-family:var(--ff);
+  font-size:15px;
+  line-height:1.6;
+  display:grid;
+  grid-template-columns:1fr;
+  grid-template-rows:auto 1fr auto;
+  min-height:100vh;
+}
+
+/* ── Top strip ──────────────────────────────────────────────────────────── */
+.topstrip{
+  display:flex;align-items:center;gap:12px;
+  padding:18px 32px;
+  border-bottom:1px solid var(--border);
+  background:rgba(7,8,12,.85);
+  backdrop-filter:blur(12px);
+  position:sticky;top:0;z-index:10;
+}
+.logo{
+  width:34px;height:34px;border-radius:10px;flex-shrink:0;
+  background:linear-gradient(135deg,#6366f1,#818cf8);
+  display:flex;align-items:center;justify-content:center;font-size:17px;
+  box-shadow:0 0 20px rgba(99,102,241,.4);
+}
+.top-title{font-size:1rem;font-weight:500;letter-spacing:-.01em}
+.v-chip{
+  font-family:var(--ffm);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 9px;border-radius:99px;
+  background:var(--a-soft);border:1px solid rgba(99,102,241,.28);color:var(--accent);
+}
+.conn-row{
+  margin-left:auto;display:flex;align-items:center;gap:7px;
+  font-family:var(--ffm);font-size:11px;color:var(--text2);
+}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);transition:background .3s,box-shadow .3s}
+.conn-dot.ok {background:var(--teal);box-shadow:0 0 8px var(--teal)}
+.conn-dot.err{background:var(--red)}
+
+/* ── Main layout ────────────────────────────────────────────────────────── */
+.main{
+  display:grid;
+  grid-template-columns:1fr 360px;
+  gap:0;
+  height:100%;
+  overflow:hidden;
+}
+
+/* LEFT PANEL — question + response ──────────────────────────────────────── */
+.left-panel{
+  display:flex;flex-direction:column;
+  padding:32px 36px;
+  border-right:1px solid var(--border);
+  overflow-y:auto;
+  gap:20px;
+}
+
+/* intro context card */
+#intro-card{
+  background:var(--surface);border:1px solid var(--border2);
+  border-left:3px solid var(--accent);
+  border-radius:var(--r-sm);padding:18px 22px;
+  display:none;animation:fadeUp .4s ease;
+}
+.intro-label{
+  font-family:var(--ffm);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:10px;
+}
+.intro-line{
+  font-size:14px;color:var(--text2);line-height:1.65;
+  padding:4px 0;border-bottom:1px solid var(--border);
+}
+.intro-line:last-child{border-bottom:none}
+
+/* branch pill */
+#branch-pill{
+  display:none;align-items:center;gap:8px;
+  font-family:var(--ffm);font-size:10.5px;font-weight:500;
+  letter-spacing:.07em;text-transform:uppercase;
+  padding:5px 14px;border-radius:99px;border:1px solid;
+  width:fit-content;
+}
+#branch-pill.pos{color:var(--green);border-color:rgba(74,222,128,.25);background:rgba(74,222,128,.07)}
+#branch-pill.neg{color:var(--red);  border-color:rgba(248,113,113,.25);background:var(--r-soft)}
+#branch-pill.neu{color:var(--amber);border-color:rgba(251,191,36,.25);background:rgba(251,191,36,.07)}
+
+/* question block */
+.q-block{flex-shrink:0}
+.q-eyebrow{
+  font-family:var(--ffm);font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:14px;display:flex;align-items:center;gap:10px;
+}
+.q-node-badge{
+  padding:2px 8px;border-radius:99px;
+  background:var(--a-soft);color:var(--accent);font-size:10px;
+}
+#q-text{
+  font-size:clamp(1.4rem,2.8vw,2rem);
+  font-weight:400;line-height:1.45;color:var(--text);
+  letter-spacing:-.015em;
+  transition:opacity .28s,transform .28s;
+}
+#q-text.fade{opacity:0;transform:translateY(6px)}
+
+/* waveform */
+.wave-wrap{
+  flex-shrink:0;height:56px;border-radius:var(--r-sm);overflow:hidden;
+  background:var(--surface);border:1px solid var(--border);position:relative;
+}
+#waveform{display:block;width:100%;height:100%}
+.wave-badge{
+  position:absolute;top:8px;left:12px;
+  font-family:var(--ffm);font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--text3);transition:color .3s;
+}
+.wave-badge.live{color:var(--red)}
+
+/* streaming ack */
+.stream-block{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:16px 20px;
+  min-height:0;overflow:hidden;
+  max-height:0;transition:max-height .35s ease,padding .35s ease;
+  padding-top:0;padding-bottom:0;
+}
+.stream-block.open{max-height:200px;padding:16px 20px}
+.stream-lbl{
+  font-family:var(--ffm);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:8px;
+}
+#stream-text{
+  font-size:15px;line-height:1.65;color:var(--text2);
+  white-space:pre-wrap;
+}
+#stream-cursor{
+  display:inline-block;width:2px;height:14px;background:var(--accent);
+  margin-left:2px;vertical-align:middle;
+  animation:blink .85s step-end infinite;
+}
+#stream-cursor.hidden{display:none}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* chat log */
+#chat-log{
+  display:flex;flex-direction:column;gap:10px;
+  flex:1;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:var(--border2) transparent;
+  padding-right:4px;
+}
+#chat-log::-webkit-scrollbar{width:3px}
+#chat-log::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
+.bubble{display:flex;gap:10px;animation:fadeUp .28s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.bubble.bot {flex-direction:row}
+.bubble.user{flex-direction:row-reverse}
+.b-av{
+  width:30px;height:30px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:14px;margin-top:1px;
+}
+.bubble.bot  .b-av{background:var(--a-soft);color:var(--accent)}
+.bubble.user .b-av{background:var(--t-soft);color:var(--teal)}
+.b-body{
+  max-width:82%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:10px 14px;font-size:14px;line-height:1.6;
+}
+.bubble.user .b-body{text-align:right}
+.b-role{
+  font-family:var(--ffm);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--text3);margin-bottom:3px;
+}
+
+/* RIGHT PANEL — controls ───────────────────────────────────────────────── */
+.right-panel{
+  display:flex;flex-direction:column;
+  padding:28px 28px 24px;
+  gap:20px;
+  overflow-y:auto;
+}
+
+/* progress */
+.prog-label{
+  font-family:var(--ffm);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text3);margin-bottom:8px;
+}
+.prog-steps{display:flex;gap:5px;margin-bottom:6px}
+.step{
+  flex:1;height:4px;border-radius:99px;
+  background:var(--border2);transition:background .5s;
+}
+.step.done  {background:var(--accent)}
+.step.active{
+  background:linear-gradient(90deg,var(--accent),var(--teal));
+  box-shadow:0 0 10px rgba(99,102,241,.4);
+}
+.prog-names{
+  display:flex;justify-content:space-between;
+  font-family:var(--ffm);font-size:9.5px;color:var(--text3);letter-spacing:.05em;
+}
+
+/* divider */
+.divider{height:1px;background:var(--border);flex-shrink:0}
+
+/* mic zone */
+.mic-section{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:16px;
+}
+.mic-zone{
+  position:relative;width:200px;height:200px;
+  border-radius:50%;border:1.5px dashed var(--border2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  cursor:crosshair;transition:border-color .25s,background .25s;
+  user-select:none;-webkit-user-select:none;
+}
+.mic-zone.ready{
+  border-color:rgba(99,102,241,.35);
+  background:var(--a-soft);
+}
+.mic-zone.hover-active{
+  border-color:rgba(248,113,113,.5);
+  background:rgba(248,113,113,.05);
+}
+.mic-zone.busy{
+  border-color:var(--border);cursor:not-allowed;
+}
+
+/* ripple rings on hover-active */
+.mic-zone.hover-active::before,
+.mic-zone.hover-active::after{
+  content:'';position:absolute;border-radius:50%;border:1px solid rgba(248,113,113,.3);
+  animation:ripple 1.6s ease-out infinite;
+}
+.mic-zone.hover-active::before{width:210px;height:210px;animation-delay:0s}
+.mic-zone.hover-active::after {width:230px;height:230px;animation-delay:.4s}
+@keyframes ripple{0%{transform:scale(.92);opacity:.7}100%{transform:scale(1.05);opacity:0}}
+
+.mic-btn-vis{
+  width:72px;height:72px;border-radius:50%;
+  background:var(--surface2);border:2px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;font-size:28px;
+  pointer-events:none;
+  transition:border-color .25s,box-shadow .25s,transform .2s;
+}
+.mic-zone.ready       .mic-btn-vis{border-color:rgba(99,102,241,.5);box-shadow:0 0 0 8px var(--a-soft)}
+.mic-zone.hover-active .mic-btn-vis{
+  border-color:var(--red);
+  box-shadow:0 0 0 12px rgba(248,113,113,.1);
+  transform:scale(1.08);
+}
+.mic-zone.busy        .mic-btn-vis{opacity:.3}
+
+.zone-hint{
+  font-family:var(--ffm);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text3);pointer-events:none;transition:color .25s;
+}
+.mic-zone.ready        .zone-hint{color:var(--accent)}
+.mic-zone.hover-active .zone-hint{color:var(--red)}
+
+/* mobile tap button */
+#mic-touch{
+  display:none;width:80px;height:80px;border-radius:50%;
+  background:var(--surface2);border:2px solid var(--border2);
+  font-size:28px;cursor:pointer;align-items:center;justify-content:center;
+  outline:none;transition:border-color .2s,box-shadow .2s;
+}
+#mic-touch.recording{border-color:var(--red);box-shadow:0 0 0 10px rgba(248,113,113,.1)}
+
+/* status */
+#status-line{
+  font-size:13px;color:var(--text2);text-align:center;
+  min-height:20px;transition:color .25s;
+}
+#status-line.active{color:var(--teal)}
+#status-line.error {color:var(--red)}
+
+/* audio bars */
+.audio-bars{display:none;align-items:flex-end;gap:3px;height:18px}
+.audio-bars.on{display:flex}
+.audio-bars span{
+  width:3px;border-radius:99px;background:var(--teal);
+  animation:bar .75s ease-in-out infinite;
+}
+.audio-bars span:nth-child(1){height:6px;animation-delay:0s}
+.audio-bars span:nth-child(2){height:12px;animation-delay:.1s}
+.audio-bars span:nth-child(3){height:18px;animation-delay:.2s}
+.audio-bars span:nth-child(4){height:12px;animation-delay:.3s}
+.audio-bars span:nth-child(5){height:6px;animation-delay:.4s}
+@keyframes bar{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+
+/* latency */
+.lat-section{}
+.lat-label{
+  font-family:var(--ffm);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text3);margin-bottom:10px;
+}
+.lat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lat-pill{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:10px 12px;
+  transition:border-color .4s;
+}
+.lat-pill.lit{border-color:rgba(45,212,191,.3)}
+.lat-key{
+  font-family:var(--ffm);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text3);margin-bottom:4px;transition:color .4s;
+}
+.lat-pill.lit .lat-key{color:var(--teal)}
+.lat-val{
+  font-family:var(--ffm);font-size:16px;font-weight:500;
+  color:var(--text3);transition:color .4s;
+}
+.lat-pill.lit .lat-val{color:var(--text)}
+.lat-unit{font-size:10px;color:var(--text3);margin-left:2px}
+
+/* error toast */
+#err-toast{
+  display:none;padding:10px 14px;border-radius:var(--r-sm);
+  border:1px solid rgba(248,113,113,.3);background:var(--r-soft);
+  font-size:13px;color:var(--red);
+}
+
+/* ── Bottom status bar ──────────────────────────────────────────────────── */
+.bottombar{
+  display:flex;align-items:center;gap:14px;
+  padding:10px 32px;
+  border-top:1px solid var(--border);
+  background:rgba(7,8,12,.9);
+  backdrop-filter:blur(12px);
+  font-family:var(--ffm);font-size:11px;color:var(--text3);
+}
+.audio-bars-bottom{display:none;align-items:flex-end;gap:2px;height:14px}
+.audio-bars-bottom.on{display:flex}
+.audio-bars-bottom span{
+  width:2px;border-radius:99px;background:var(--teal);
+  animation:bar .75s ease-in-out infinite;
+}
+.audio-bars-bottom span:nth-child(1){height:5px;animation-delay:0s}
+.audio-bars-bottom span:nth-child(2){height:10px;animation-delay:.1s}
+.audio-bars-bottom span:nth-child(3){height:14px;animation-delay:.2s}
+.audio-bars-bottom span:nth-child(4){height:10px;animation-delay:.3s}
+.audio-bars-bottom span:nth-child(5){height:5px;animation-delay:.4s}
+
+/* ── Done screen ────────────────────────────────────────────────────────── */
+#done-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(7,8,12,.95);backdrop-filter:blur(16px);
+  flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;z-index:100;
+}
+.done-ring{
+  width:88px;height:88px;border-radius:50%;
+  border:2px solid var(--teal);
+  display:flex;align-items:center;justify-content:center;font-size:40px;
+  box-shadow:0 0 40px var(--t-glow);
+  animation:fadeUp .5s ease;
+}
+.done-title{
+  font-size:2rem;font-weight:500;letter-spacing:-.025em;
+  animation:fadeUp .5s .08s both;
+}
+.done-sub{
+  font-size:15px;color:var(--text2);max-width:380px;text-align:center;line-height:1.7;
+  animation:fadeUp .5s .15s both;
+}
+#restart-btn{
+  padding:11px 32px;border-radius:99px;
+  background:var(--a-soft);border:1px solid rgba(99,102,241,.3);
+  color:var(--accent);font-family:var(--ff);font-size:14px;
+  cursor:pointer;transition:background .2s;
+  animation:fadeUp .5s .22s both;
+}
+#restart-btn:hover{background:var(--a-glow)}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media(max-width:800px){
+  .main{grid-template-columns:1fr;grid-template-rows:1fr auto}
+  .right-panel{border-top:1px solid var(--border);border-right:none}
+  .left-panel{border-right:none}
+  .mic-zone{width:160px;height:160px}
+  .mic-zone.hover-active::before{width:170px;height:170px}
+  .mic-zone.hover-active::after{width:190px;height:190px}
+}
+@media(max-width:500px){
+  .topstrip{padding:14px 18px}
+  .left-panel{padding:20px 18px}
+  .right-panel{padding:18px 18px}
+}
+</style>
+</head>
+<body>
+
+<!-- Top strip -->
+<header class="topstrip">
+  <div class="logo">🎙</div>
+  <span class="top-title">Voice Survey</span>
+  <span class="v-chip">V2</span>
+  <div class="conn-row">
+    <div class="conn-dot" id="conn-dot"></div>
+    <span id="conn-label">connecting</span>
+  </div>
+</header>
+
+<!-- Main grid -->
+<div class="main" id="main-grid">
+
+  <!-- LEFT: question + conversation ─────────────────────────────────────── -->
+  <section class="left-panel">
+
+    <!-- Intro context card (shown before Q1) -->
+    <div id="intro-card">
+      <div class="intro-label">About this survey</div>
+      <div id="intro-lines"></div>
+    </div>
+
+    <!-- Branch indicator -->
+    <div id="branch-pill"></div>
+
+    <!-- Question -->
+    <div class="q-block">
+      <div class="q-eyebrow">
+        <span>Current Question</span>
+        <span class="q-node-badge" id="q-node">—</span>
+      </div>
+      <div id="q-text">Connecting to server…</div>
+    </div>
+
+    <!-- Waveform -->
+    <div class="wave-wrap">
+      <canvas id="waveform"></canvas>
+      <div class="wave-badge" id="wave-badge">IDLE</div>
+    </div>
+
+    <!-- Streaming bot response -->
+    <div class="stream-block" id="stream-block">
+      <div class="stream-lbl">Bot responding</div>
+      <div id="stream-text"></div><span id="stream-cursor" class="hidden"></span>
+    </div>
+
+    <!-- Error toast -->
+    <div id="err-toast"></div>
+
+    <!-- Chat history -->
+    <div id="chat-log"></div>
+
+  </section>
+
+  <!-- RIGHT: mic + progress + latency ───────────────────────────────────── -->
+  <section class="right-panel">
+
+    <!-- Progress -->
+    <div>
+      <div class="prog-label">Survey progress</div>
+      <div class="prog-steps">
+        <div class="step active" id="step-1"></div>
+        <div class="step"        id="step-2"></div>
+        <div class="step"        id="step-3"></div>
+        <div class="step"        id="step-4"></div>
+      </div>
+      <div class="prog-names">
+        <span>Rating</span><span>Feedback</span><span>Recommend</span><span>Done</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Mic zone -->
+    <div class="mic-section">
+      <!-- Desktop hover zone -->
+      <div class="mic-zone busy" id="mic-zone">
+        <div class="mic-btn-vis" id="mic-visual">🎙</div>
+        <div class="zone-hint"   id="zone-hint">hover to speak</div>
+      </div>
+
+      <!-- Mobile tap button -->
+      <button id="mic-touch">🎙</button>
+
+      <!-- Status -->
+      <div id="status-line">Connecting to server…</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Latency dashboard -->
+    <div class="lat-section">
+      <div class="lat-label">Latency (last turn)</div>
+      <div class="lat-grid">
+        <div class="lat-pill" id="lat-stt">
+          <div class="lat-key">STT</div>
+          <div class="lat-val">—<span class="lat-unit"></span></div>
+        </div>
+        <div class="lat-pill" id="lat-llm">
+          <div class="lat-key">LLM</div>
+          <div class="lat-val">—<span class="lat-unit"></span></div>
+        </div>
+        <div class="lat-pill" id="lat-tts">
+          <div class="lat-key">TTS</div>
+          <div class="lat-val">—<span class="lat-unit"></span></div>
+        </div>
+        <div class="lat-pill" id="lat-total">
+          <div class="lat-key">Total</div>
+          <div class="lat-val">—<span class="lat-unit"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="err-toast-right" style="display:none"></div>
+
+  </section>
+</div>
+
+<!-- Bottom bar -->
+<div class="bottombar">
+  <div class="audio-bars-bottom" id="audio-bars">
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+  <span id="bottom-status">Groq Whisper STT · Llama 3.1 LLM · gTTS</span>
+  <span style="margin-left:auto;font-size:10px">V3 coming: intent cache, Hindi, &lt;300ms</span>
+</div>
+
+<!-- Done overlay -->
+<div id="done-overlay">
+  <div class="done-ring">✓</div>
+  <div class="done-title">Survey Complete</div>
+  <div class="done-sub">Thank you for your time. Your feedback helps us improve every single day.</div>
+  <button id="restart-btn">↺ Start Over</button>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────
+const WS_URL    = `ws://${location.host}/ws`;
+const NODE_STEP = {Q1:1,Q2_pos:2,Q2_neg:2,Q2_neu:2,Q3:3,Q_close:4};
+const MIN_HOLD  = 300;   // ms guard against accidental micro-hovers
+const CHUNK_MS  = 100;   // MediaRecorder timeslice
+const isTouchDev = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+// ── State ─────────────────────────────────────────────────────────────────
+let ws=null, mediaRec=null;
+let isRecording=false, isBusy=false, isDone=false;
+let recStart=0, hoverTimer=null;
+let audioQueue=[], pendingBlobs=[], audioPlaying=false;
+let streamTxt="", latSttMs=null;
+let audioCtx=null, analyser=null, waveRAF=null;
+
+// ── DOM ───────────────────────────────────────────────────────────────────
+const $=id=>document.getElementById(id);
+const connDot=$('conn-dot'), connLabel=$('conn-label');
+const qText=$('q-text'), qNode=$('q-node');
+const introCard=$('intro-card'), introLines=$('intro-lines');
+const branchPill=$('branch-pill');
+const waveCvs=$('waveform'), waveBadge=$('wave-badge');
+const streamBlock=$('stream-block'), streamEl=$('stream-text'), streamCur=$('stream-cursor');
+const chatLog=$('chat-log');
+const errToast=$('err-toast');
+const micZone=$('mic-zone'), micVisual=$('mic-visual'), zoneHint=$('zone-hint');
+const micTouch=$('mic-touch');
+const statusLine=$('status-line');
+const audioBars=$('audio-bars');
+const doneOverlay=$('done-overlay'), restartBtn=$('restart-btn');
+const steps=[1,2,3,4].map(i=>$(`step-${i}`));
+const latPills={
+  stt:$('lat-stt'),llm:$('lat-llm'),tts:$('lat-tts'),total:$('lat-total')
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function setStatus(msg,cls=''){statusLine.textContent=msg;statusLine.className=cls}
+function setConn(s){
+  connDot.className='conn-dot'+(s==='ok'?' ok':s==='err'?' err':'');
+  connLabel.textContent=s==='ok'?'connected':s==='err'?'error':'connecting';
+}
+function showError(msg,auto=true){
+  errToast.textContent='⚠  '+msg;errToast.style.display='block';
+  if(auto)setTimeout(()=>{errToast.style.display='none'},5000);
+}
+
+function setStep(node){
+  const active=NODE_STEP[node]||1;
+  steps.forEach((el,i)=>{
+    el.className='step';
+    if(i+1<active)el.classList.add('done');
+    else if(i+1===active)el.classList.add('active');
+  });
+}
+
+function setBranch(node){
+  const map={
+    Q2_pos:['pos','😊 Positive path'],
+    Q2_neg:['neg','😟 Negative path'],
+    Q2_neu:['neu','😐 Neutral path'],
+    Q3:    ['neu','💬 Recommendation'],
+  };
+  if(!map[node]){branchPill.style.display='none';return}
+  const[cls,label]=map[node];
+  branchPill.className=cls;branchPill.textContent=label;
+  branchPill.style.display='flex';
+}
+
+function setQuestion(text,node){
+  qText.classList.add('fade');
+  setTimeout(()=>{
+    qText.textContent=text;
+    qNode.textContent=node;
+    qText.classList.remove('fade');
+    setStep(node);setBranch(node);
+  },260);
+}
+
+function setMicState(state){
+  micZone.className=`mic-zone ${state==='recording'?'hover-active':state}`;
+  if(state==='ready'){
+    zoneHint.textContent=isTouchDev?'tap to speak':'hover to speak';
+    micVisual.textContent='🎙';
+  }else if(state==='recording'){
+    zoneHint.textContent=isTouchDev?'tap to stop':'release to send';
+    micVisual.textContent='⏹';
+  }else{
+    zoneHint.textContent='processing…';
+    micVisual.textContent='⏳';
+  }
+  micTouch.disabled=state==='busy';
+  state==='recording'?micTouch.classList.add('recording'):micTouch.classList.remove('recording');
+}
+
+// ── Intro card ────────────────────────────────────────────────────────────
+function showIntro(lines){
+  introLines.innerHTML='';
+  lines.forEach(l=>{
+    const d=document.createElement('div');
+    d.className='intro-line';d.textContent=l;
+    introLines.appendChild(d);
+  });
+  introCard.style.display='block';
+}
+
+// ── Chat bubbles ──────────────────────────────────────────────────────────
+function addBubble(role,text){
+  const wrap=document.createElement('div');
+  const av=document.createElement('div');
+  const body=document.createElement('div');
+  const lbl=document.createElement('div');
+  const cnt=document.createElement('div');
+  wrap.className=`bubble ${role}`;av.className='b-av';
+  body.className='b-body';lbl.className='b-role';
+  av.textContent=role==='bot'?'🤖':'🎙';
+  lbl.textContent=role==='bot'?'Survey Bot':'You';
+  cnt.textContent=text;body.append(lbl,cnt);wrap.append(av,body);
+  chatLog.append(wrap);chatLog.scrollTop=chatLog.scrollHeight;
+}
+
+// ── Streaming box ─────────────────────────────────────────────────────────
+function openStream(){
+  streamTxt='';streamEl.textContent='';
+  streamCur.classList.remove('hidden');
+  streamBlock.classList.add('open');
+}
+function appendToken(tok){streamTxt+=tok;streamEl.textContent=streamTxt}
+function closeStream(){
+  streamCur.classList.add('hidden');
+  if(streamTxt.trim()){addBubble('bot',streamTxt.trim());streamTxt='';streamEl.textContent=''}
+  streamBlock.classList.remove('open');
+}
+
+// ── Latency pills ─────────────────────────────────────────────────────────
+function setLat(key,ms){
+  const el=latPills[key];
+  el.classList.add('lit');
+  el.querySelector('.lat-val').innerHTML=`${ms}<span class="lat-unit">ms</span>`;
+}
+function resetLat(){
+  Object.values(latPills).forEach(el=>{
+    el.classList.remove('lit');
+    el.querySelector('.lat-val').innerHTML='—<span class="lat-unit"></span>';
+  });
+}
+
+// ── Audio queue ───────────────────────────────────────────────────────────
+function sealAudio(){
+  if(!audioQueue.length)return;
+  const total=audioQueue.reduce((n,c)=>n+c.length,0);
+  const merged=new Uint8Array(total);
+  let off=0;for(const c of audioQueue){merged.set(c,off);off+=c.length}
+  audioQueue=[];
+  pendingBlobs.push(new Blob([merged.buffer],{type:'audio/mpeg'}));
+  if(!audioPlaying)playNext();
+}
+function playNext(){
+  if(!pendingBlobs.length){
+    audioPlaying=false;audioBars.classList.remove('on');
+    document.querySelector('#q-text').closest('#q-card')?.classList.remove('speaking');
+    return;
+  }
+  audioPlaying=true;audioBars.classList.add('on');
+  const blob=pendingBlobs.shift();
+  const url=URL.createObjectURL(blob);
+  const a=new Audio(url);
+  a.onended=()=>{URL.revokeObjectURL(url);playNext()};
+  a.onerror=()=>{URL.revokeObjectURL(url);playNext()};
+  a.play().catch(()=>playNext());
+}
+
+// ── Waveform ──────────────────────────────────────────────────────────────
+function startWave(stream){
+  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  analyser=audioCtx.createAnalyser();analyser.fftSize=256;
+  audioCtx.createMediaStreamSource(stream).connect(analyser);
+  waveBadge.textContent='RECORDING';waveBadge.classList.add('live');
+  drawWave();
+}
+function stopWave(){
+  if(waveRAF){cancelAnimationFrame(waveRAF);waveRAF=null}
+  if(audioCtx){audioCtx.close();audioCtx=null;analyser=null}
+  const ctx=waveCvs.getContext('2d');
+  ctx.clearRect(0,0,waveCvs.width,waveCvs.height);
+  waveBadge.textContent='IDLE';waveBadge.classList.remove('live');
+}
+function drawWave(){
+  const ctx=waveCvs.getContext('2d');
+  const W=waveCvs.offsetWidth,H=waveCvs.offsetHeight;
+  waveCvs.width=W;waveCvs.height=H;
+  const buf=new Uint8Array(analyser.frequencyBinCount);
+  const frame=()=>{
+    waveRAF=requestAnimationFrame(frame);
+    analyser.getByteTimeDomainData(buf);
+    ctx.clearRect(0,0,W,H);
+    ctx.beginPath();ctx.strokeStyle='#f87171';ctx.lineWidth=1.8;
+    const step=W/buf.length;
+    buf.forEach((v,i)=>{
+      const y=((v/128)-1)*(H*.42)+H/2;
+      i===0?ctx.moveTo(0,y):ctx.lineTo(i*step,y);
+    });
+    ctx.stroke();
+  };
+  frame();
+}
+
+// ── Recording ─────────────────────────────────────────────────────────────
+async function startRecording(){
+  if(isBusy||isRecording||isDone)return;
+  let stream;
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false})}
+  catch{showError('Microphone access denied — allow in browser settings.',false);return}
+  startWave(stream);
+  const mt=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus'].find(m=>MediaRecorder.isTypeSupported(m))||'';
+  mediaRec=new MediaRecorder(stream,mt?{mimeType:mt}:{});
+  mediaRec.ondataavailable=async ev=>{
+    if(ev.data.size<100)return;
+    const buf=await ev.data.arrayBuffer();
+    const b64=btoa(String.fromCharCode(...new Uint8Array(buf)));
+    wsSend({type:'audio_chunk',data:b64});
+  };
+  mediaRec.start(CHUNK_MS);
+  isRecording=true;recStart=Date.now();
+  setMicState('recording');
+  setStatus('Recording… release when done','active');
+}
+
+async function stopRecording(){
+  if(!isRecording)return;
+  const held=Date.now()-recStart;
+  isRecording=false;stopWave();
+  if(held<MIN_HOLD){
+    if(mediaRec){mediaRec.stop();mediaRec.stream.getTracks().forEach(t=>t.stop());mediaRec=null}
+    if(!isBusy){setMicState('ready');setStatus('Hold a bit longer while speaking','error');
+      setTimeout(()=>setStatus('Hover to speak'),2000)}
+    return;
+  }
+  isBusy=true;setMicState('busy');setStatus('Transcribing…','active');resetLat();
+  mediaRec.stop();mediaRec.stream.getTracks().forEach(t=>t.stop());mediaRec=null;
+  await new Promise(r=>setTimeout(r,160));
+  wsSend({type:'audio_end'});
+}
+
+// ── Hover-to-record (desktop) ─────────────────────────────────────────────
+micZone.addEventListener('mouseenter',()=>{
+  if(isBusy||isDone||isRecording)return;
+  hoverTimer=setTimeout(startRecording,80);
+});
+micZone.addEventListener('mouseleave',()=>{
+  clearTimeout(hoverTimer);
+  if(isRecording)stopRecording();
+});
+
+// ── Tap-to-toggle (mobile) ────────────────────────────────────────────────
+micTouch.addEventListener('touchstart',async e=>{
+  e.preventDefault();
+  if(isBusy||isDone)return;
+  isRecording?stopRecording():startRecording();
+},{passive:false});
+
+// ── WebSocket ─────────────────────────────────────────────────────────────
+function wsSend(obj){if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(obj))}
+
+function handleMsg(msg){
+  switch(msg.type){
+
+    case 'intro_text':
+      showIntro(msg.lines);
+      break;
+
+    case 'stt_done':
+      latSttMs=msg.ms;setLat('stt',msg.ms);
+      break;
+
+    case 'transcript_final':
+      addBubble('user',msg.text);openStream();
+      setStatus('Bot thinking…','active');
+      break;
+
+    case 'llm_token':
+      appendToken(msg.text);
+      break;
+
+    case 'audio_chunk':{
+      const bytes=Uint8Array.from(atob(msg.data),c=>c.charCodeAt(0));
+      audioQueue.push(bytes);
+      break;
+    }
+
+    case 'audio_ready':
+      sealAudio();
+      break;
+
+    case 'next_question':
+      closeStream();
+      // Hide intro card once Q1 is answered
+      if(msg.node!=='Q1')introCard.style.display='none';
+      setQuestion(msg.text,msg.node);
+      isBusy=false;setMicState('ready');
+      setStatus('Hover to speak your answer');
+      if(msg.latency){
+        if(msg.latency.llm)  setLat('llm',msg.latency.llm);
+        if(msg.latency.tts)  setLat('tts',msg.latency.tts);
+        if(msg.latency.total)setLat('total',msg.latency.total+(latSttMs||0));
+      }
+      break;
+
+    case 'survey_done':
+      closeStream();showDone();
+      break;
+
+    case 'error':
+      showError(msg.message||'Something went wrong');
+      isBusy=false;setMicState('ready');
+      setStatus('Hover to speak your answer');
+      break;
+  }
+}
+
+function connect(){
+  ws=new WebSocket(WS_URL);
+  ws.onopen=()=>{
+    setConn('ok');
+    if(!isDone){setMicState('busy');setStatus('Loading survey…')}
+  };
+  ws.onmessage=e=>{try{handleMsg(JSON.parse(e.data))}catch(err){console.error(err)}};
+  ws.onclose=()=>{
+    setConn('err');setMicState('busy');
+    setStatus('Disconnected — reconnecting…','error');
+    setTimeout(connect,2000);
+  };
+  ws.onerror=()=>setConn('err');
+}
+
+// ── Done ──────────────────────────────────────────────────────────────────
+function showDone(){
+  isDone=true;steps.forEach(s=>{s.className='step done'});
+  doneOverlay.style.display='flex';
+  audioBars.classList.remove('on');
+}
+
+restartBtn.addEventListener('click',()=>{
+  isDone=false;isBusy=false;isRecording=false;
+  audioQueue=[];pendingBlobs=[];audioPlaying=false;
+  streamTxt='';streamEl.textContent='';streamBlock.classList.remove('open');
+  chatLog.innerHTML='';errToast.style.display='none';
+  audioBars.classList.remove('on');branchPill.style.display='none';
+  introCard.style.display='none';introLines.innerHTML='';
+  doneOverlay.style.display='none';
+  setMicState('busy');setStatus('Restarting…');
+  wsSend({type:'start_session'});
+});
+
+// ── Touch setup ───────────────────────────────────────────────────────────
+if(isTouchDev){
+  micZone.style.display='none';
+  micTouch.style.display='flex';
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+connect();
+</script>
+</body>
+</html>

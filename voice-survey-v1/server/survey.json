@@ -1,0 +1,29 @@
+{
+  "questions": [
+    {
+      "id": "Q1",
+      "text": "How satisfied are you with our service today? Please rate us from 1 to 5.",
+      "type": "scale"
+    },
+    {
+      "id": "Q2",
+      "text": "What did you enjoy most about your experience?",
+      "type": "open"
+    },
+    {
+      "id": "Q3",
+      "text": "What could we improve to serve you better?",
+      "type": "open"
+    },
+    {
+      "id": "Q4",
+      "text": "Would you recommend us to a friend? Please say Yes or No.",
+      "type": "yesno"
+    },
+    {
+      "id": "Q5",
+      "text": "Do you have any final comments or anything else you'd like to share?",
+      "type": "open"
+    }
+  ]
+}

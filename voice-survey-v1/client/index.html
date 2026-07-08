@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice Survey</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Tokens ─────────────────────────────────────────────── */
+    :root {
+      --bg:        #0c0e12;
+      --surface:   #141720;
+      --border:    #232737;
+      --accent:    #6EE7B7;        /* cool mint */
+      --accent2:   #38bdf8;        /* sky blue  */
+      --danger:    #f87171;
+      --text:      #e8eaf0;
+      --muted:     #6b7280;
+      --user-bg:   #1a2236;
+      --bot-bg:    #101318;
+      --radius:    14px;
+      --font-head: 'DM Serif Display', Georgia, serif;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+    }
+
+    /* ── Reset ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 0 16px 40px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header {
+      width: 100%;
+      max-width: 680px;
+      padding: 40px 0 24px;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    header h1 {
+      font-family: var(--font-head);
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      font-weight: 400;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    header .badge {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: rgba(110,231,183,.1);
+      border: 1px solid rgba(110,231,183,.25);
+      padding: 2px 8px;
+      border-radius: 99px;
+    }
+
+    /* ── Current question card ──────────────────────────────── */
+    #question-card {
+      width: 100%;
+      max-width: 680px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 32px;
+      margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    #question-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(110,231,183,.05) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    #question-label {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+    #question-text {
+      font-family: var(--font-head);
+      font-size: clamp(1.1rem, 3vw, 1.4rem);
+      font-weight: 400;
+      color: var(--text);
+      line-height: 1.45;
+      font-style: italic;
+      min-height: 2.2em;
+      transition: opacity .3s;
+    }
+    #question-text.hidden { opacity: 0; }
+
+    /* ── Progress bar ───────────────────────────────────────── */
+    .progress-wrap {
+      width: 100%;
+      max-width: 680px;
+      margin-bottom: 20px;
+    }
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .progress-bar {
+      height: 3px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 99px;
+      transition: width .6s cubic-bezier(.4,0,.2,1);
+      width: 0%;
+    }
+
+    /* ── Chat log ───────────────────────────────────────────── */
+    #chat-log {
+      width: 100%;
+      max-width: 680px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 28px;
+      max-height: 320px;
+      overflow-y: auto;
+      padding-right: 4px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    #chat-log::-webkit-scrollbar { width: 4px; }
+    #chat-log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+    .bubble {
+      display: flex;
+      gap: 10px;
+      animation: fadeUp .3s ease both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .bubble-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .bubble.bot .bubble-avatar  { background: rgba(110,231,183,.15); color: var(--accent); }
+    .bubble.user .bubble-avatar { background: rgba(56,189,248,.12); color: var(--accent2); }
+    .bubble.user { flex-direction: row-reverse; }
+
+    .bubble-body {
+      max-width: 80%;
+      background: var(--bot-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--text);
+    }
+    .bubble.user .bubble-body {
+      background: var(--user-bg);
+      text-align: right;
+    }
+    .bubble-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+
+    /* ── Record button area ─────────────────────────────────── */
+    .record-area {
+      width: 100%;
+      max-width: 680px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    #record-btn {
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      color: var(--text);
+      font-size: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transition: transform .15s, border-color .2s, box-shadow .2s;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #record-btn:hover:not(:disabled) {
+      transform: scale(1.06);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 6px rgba(110,231,183,.08);
+    }
+    #record-btn.recording {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 8px rgba(248,113,113,.12), 0 0 0 16px rgba(248,113,113,.05);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 8px rgba(248,113,113,.12), 0 0 0 16px rgba(248,113,113,.05); }
+      50%       { box-shadow: 0 0 0 12px rgba(248,113,113,.18), 0 0 0 24px rgba(248,113,113,.08); }
+    }
+    #record-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+    #status-text {
+      font-size: 13px;
+      color: var(--muted);
+      text-align: center;
+      min-height: 1.5em;
+      transition: color .2s;
+    }
+    #status-text.active { color: var(--accent); }
+    #status-text.error  { color: var(--danger); }
+
+    /* ── Spinner ────────────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Done screen ────────────────────────────────────────── */
+    #done-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 14px;
+      padding: 40px 0;
+    }
+    #done-screen .done-icon {
+      font-size: 52px;
+      line-height: 1;
+    }
+    #done-screen h2 {
+      font-family: var(--font-head);
+      font-size: 1.8rem;
+      font-weight: 400;
+    }
+    #done-screen p { color: var(--muted); max-width: 340px; }
+    #restart-btn {
+      margin-top: 8px;
+      background: rgba(110,231,183,.1);
+      border: 1px solid rgba(110,231,183,.3);
+      color: var(--accent);
+      font-family: var(--font-body);
+      font-size: 14px;
+      padding: 10px 28px;
+      border-radius: 99px;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    #restart-btn:hover { background: rgba(110,231,183,.18); }
+
+    /* ── Transcript preview ─────────────────────────────────── */
+    #transcript-preview {
+      width: 100%;
+      max-width: 680px;
+      min-height: 36px;
+      font-size: 13px;
+      color: var(--muted);
+      font-style: italic;
+      text-align: center;
+      padding: 0 8px;
+      transition: opacity .2s;
+    }
+    #transcript-preview:empty { opacity: 0; }
+
+    /* ── Responsive ─────────────────────────────────────────── */
+    @media (max-width: 480px) {
+      #question-card { padding: 20px; }
+      .bubble-body   { max-width: 90%; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Voice Survey</h1>
+    <span class="badge">V1</span>
+  </header>
+
+  <!-- Progress -->
+  <div class="progress-wrap">
+    <div class="progress-meta">
+      <span id="progress-label">Question 1 of 5</span>
+      <span id="progress-pct">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  </div>
+
+  <!-- Current question -->
+  <div id="question-card">
+    <div id="question-label">Current Question</div>
+    <div id="question-text">Loading survey…</div>
+  </div>
+
+  <!-- Chat log -->
+  <div id="chat-log"></div>
+
+  <!-- Transcript preview (shows while processing) -->
+  <div id="transcript-preview"></div>
+
+  <!-- Record button -->
+  <div class="record-area" id="survey-area">
+    <button id="record-btn" title="Hold to record">🎙</button>
+    <div id="status-text">Hold to speak your answer</div>
+  </div>
+
+  <!-- Done screen -->
+  <div id="done-screen">
+    <div class="done-icon">✅</div>
+    <h2>Survey Complete</h2>
+    <p>Thank you so much for your time. Your feedback helps us improve every day.</p>
+    <button id="restart-btn">Start Over</button>
+  </div>
+
+  <script>
+    // ── State ──────────────────────────────────────────────────────────────
+    const BASE = '';           // same origin; change if server is elsewhere
+    let history    = [];       // [{role, content}, …]
+    let questionNo = 0;        // 0-based index of NEXT question to ask
+    let totalQs    = 5;
+    let surveydone = false;
+    let mediaRecorder = null;
+    let audioChunks   = [];
+    let isRecording   = false;
+    let isBusy        = false; // prevent overlapping requests
+
+    // ── DOM refs ───────────────────────────────────────────────────────────
+    const recordBtn   = document.getElementById('record-btn');
+    const statusText  = document.getElementById('status-text');
+    const chatLog     = document.getElementById('chat-log');
+    const questionEl  = document.getElementById('question-text');
+    const progressFill = document.getElementById('progress-fill');
+    const progressLabel = document.getElementById('progress-label');
+    const progressPct   = document.getElementById('progress-pct');
+    const transcriptPreview = document.getElementById('transcript-preview');
+    const doneScreen  = document.getElementById('done-screen');
+    const surveyArea  = document.getElementById('survey-area');
+    const restartBtn  = document.getElementById('restart-btn');
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    function setStatus(msg, cls = '') {
+      statusText.textContent = msg;
+      statusText.className = cls;
+    }
+
+    function setQuestion(text) {
+      questionEl.classList.add('hidden');
+      setTimeout(() => {
+        questionEl.textContent = text;
+        questionEl.classList.remove('hidden');
+      }, 200);
+    }
+
+    function updateProgress(answered) {
+      const pct = Math.round((answered / totalQs) * 100);
+      progressFill.style.width = pct + '%';
+      progressPct.textContent  = pct + '%';
+      const next = Math.min(answered + 1, totalQs);
+      progressLabel.textContent = answered < totalQs
+        ? `Question ${next} of ${totalQs}`
+        : `All ${totalQs} questions answered`;
+    }
+
+    function addBubble(role, text) {
+      const wrap  = document.createElement('div');
+      const avatar = document.createElement('div');
+      const body  = document.createElement('div');
+      const label = document.createElement('div');
+      const content = document.createElement('div');
+
+      wrap.className   = `bubble ${role}`;
+      avatar.className = 'bubble-avatar';
+      body.className   = 'bubble-body';
+      label.className  = 'bubble-label';
+
+      avatar.textContent  = role === 'bot' ? '🤖' : '🎙';
+      label.textContent   = role === 'bot' ? 'Survey Bot' : 'You';
+      content.textContent = text;
+
+      body.append(label, content);
+      wrap.append(avatar, body);
+      chatLog.append(wrap);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function disableRecord(busy) {
+      recordBtn.disabled = busy;
+      isBusy = busy;
+    }
+
+    // ── Audio helpers ──────────────────────────────────────────────────────
+
+    async function getMediaStream() {
+      try {
+        return await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        throw new Error('Microphone access denied. Please allow mic access and reload.');
+      }
+    }
+
+    function startRecording(stream) {
+      audioChunks = [];
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : 'audio/webm';
+
+      mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) audioChunks.push(e.data);
+      };
+      mediaRecorder.start(100);
+    }
+
+    function stopRecording() {
+      return new Promise(resolve => {
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+          resolve(blob);
+        };
+        mediaRecorder.stop();
+        mediaRecorder.stream.getTracks().forEach(t => t.stop());
+      });
+    }
+
+    // ── API calls ──────────────────────────────────────────────────────────
+
+    async function apiTranscribe(audioBlob) {
+      const form = new FormData();
+      form.append('audio', audioBlob, 'recording.webm');
+      const res = await fetch(`${BASE}/transcribe`, { method: 'POST', body: form });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || 'Transcription failed');
+      }
+      return (await res.json()).text;
+    }
+
+    async function apiRespond(transcript) {
+      const res = await fetch(`${BASE}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript, history }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || 'Response generation failed');
+      }
+      return await res.json(); // {response, next_question, done}
+    }
+
+    async function apiSynthesise(text) {
+      const res = await fetch(`${BASE}/synthesise`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || 'Audio synthesis failed');
+      }
+      return await res.blob();
+    }
+
+    async function playAudioBlob(blob) {
+      return new Promise((resolve, reject) => {
+        const url  = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.onended  = () => { URL.revokeObjectURL(url); resolve(); };
+        audio.onerror  = () => reject(new Error('Audio playback failed'));
+        audio.play().catch(reject);
+      });
+    }
+
+    // ── Core pipeline ──────────────────────────────────────────────────────
+
+    async function handleAnswer(audioBlob) {
+      disableRecord(true);
+
+      try {
+        // 1. Transcribe
+        setStatus('⟳ Transcribing…', 'active');
+        transcriptPreview.textContent = '…';
+        const transcript = await apiTranscribe(audioBlob);
+        if (!transcript) {
+          setStatus('Could not hear you — please try again.', 'error');
+          disableRecord(false);
+          return;
+        }
+
+        transcriptPreview.textContent = `"${transcript}"`;
+        addBubble('user', transcript);
+
+        // Update history with user turn
+        history.push({ role: 'user', content: transcript });
+
+        // 2. Get LLM response
+        setStatus('⟳ Thinking…', 'active');
+        const result = await apiRespond(transcript);
+        questionNo++;
+        updateProgress(questionNo);
+
+        const botText = result.done
+          ? result.next_question || result.response
+          : `${result.response} ${result.next_question}`.trim();
+
+        addBubble('bot', botText);
+        history.push({ role: 'assistant', content: botText });
+
+        // 3. Synthesise & play
+        setStatus('⟳ Speaking…', 'active');
+        const mp3Blob = await apiSynthesise(botText);
+        await playAudioBlob(mp3Blob);
+
+        transcriptPreview.textContent = '';
+
+        // 4. Check done
+        if (result.done) {
+          showDone();
+          return;
+        }
+
+        // Show next question
+        setQuestion(result.next_question);
+        setStatus('Hold to speak your answer');
+
+      } catch (err) {
+        console.error(err);
+        setStatus(`Error: ${err.message}`, 'error');
+        transcriptPreview.textContent = '';
+      } finally {
+        disableRecord(false);
+      }
+    }
+
+    // ── UI events ──────────────────────────────────────────────────────────
+
+    recordBtn.addEventListener('mousedown',  startCapture);
+    recordBtn.addEventListener('touchstart', startCapture, { passive: true });
+    recordBtn.addEventListener('mouseup',    stopCapture);
+    recordBtn.addEventListener('mouseleave', stopCapture);
+    recordBtn.addEventListener('touchend',   stopCapture);
+
+    async function startCapture(e) {
+      e.preventDefault();
+      if (isBusy || isRecording || surveydone) return;
+
+      try {
+        const stream = await getMediaStream();
+        startRecording(stream);
+        isRecording = true;
+        recordBtn.classList.add('recording');
+        recordBtn.textContent = '⏹';
+        setStatus('Recording… release when done', 'active');
+      } catch (err) {
+        setStatus(err.message, 'error');
+      }
+    }
+
+    async function stopCapture(e) {
+      if (!isRecording) return;
+      isRecording = false;
+      recordBtn.classList.remove('recording');
+      recordBtn.textContent = '🎙';
+      setStatus('Processing…', 'active');
+
+      const audioBlob = await stopRecording();
+      await handleAnswer(audioBlob);
+    }
+
+    restartBtn.addEventListener('click', () => {
+      history    = [];
+      questionNo = 0;
+      surveydone = false;
+      doneScreen.style.display  = 'none';
+      surveyArea.style.display  = 'flex';
+      chatLog.innerHTML         = '';
+      transcriptPreview.textContent = '';
+      updateProgress(0);
+      initSurvey();
+    });
+
+    // ── Initialise ─────────────────────────────────────────────────────────
+
+    function showDone() {
+      surveydone = true;
+      surveyArea.style.display  = 'none';
+      doneScreen.style.display  = 'flex';
+      setQuestion('Survey complete — thank you!');
+    }
+
+    async function initSurvey() {
+      setStatus('Hold to speak your answer');
+      try {
+        // Ask the server for the first question by sending an empty "start" signal
+        setStatus('⟳ Loading first question…', 'active');
+        const result = await apiRespond('START_SURVEY');
+        const firstQ = result.next_question;
+        setQuestion(firstQ);
+        history.push({ role: 'assistant', content: firstQ });
+
+        // Speak the first question
+        setStatus('⟳ Speaking…', 'active');
+        const mp3 = await apiSynthesise(firstQ);
+        await playAudioBlob(mp3);
+
+        setStatus('Hold to speak your answer');
+      } catch (err) {
+        // Fallback: show the first question without TTS if server unreachable
+        setQuestion('How satisfied are you with our service today? Please rate us from 1 to 5.');
+        setStatus('Hold to speak your answer');
+      }
+      updateProgress(0);
+    }
+
+    initSurvey();
+  </script>
+</body>
+</html>

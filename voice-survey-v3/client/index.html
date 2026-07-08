@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>L&T Finance · Voice Bot V3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#07080c;--s1:#0d0f18;--s2:#121523;
+  --border:#1a1e30;--border2:#222740;
+  --accent:#6366f1;--a-soft:rgba(99,102,241,.13);--a-glow:rgba(99,102,241,.22);
+  --teal:#2dd4bf;--t-soft:rgba(45,212,191,.11);--t-glow:rgba(45,212,191,.2);
+  --red:#f87171;--r-soft:rgba(248,113,113,.1);
+  --green:#4ade80;--amber:#fbbf24;
+  --text:#dde1f0;--text2:#7b849e;--text3:#2e3550;
+  --r:12px;--rsm:8px;
+  --ff:'DM Sans',system-ui,sans-serif;
+  --ffm:'DM Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+
+body{
+  min-height:100vh;background:var(--bg);
+  background-image:radial-gradient(ellipse 80% 35% at 50% -5%,rgba(99,102,241,.1) 0%,transparent 70%);
+  color:var(--text);font-family:var(--ff);font-size:15px;line-height:1.6;
+  display:flex;flex-direction:column;
+}
+
+/* ── Start overlay — FIXED so it always covers full viewport ── */
+#start-overlay{
+  position:fixed;inset:0;z-index:200;
+  background:rgba(7,8,12,.94);backdrop-filter:blur(20px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;padding:24px;
+}
+#start-overlay.hidden{display:none}
+.start-logo{font-size:56px;animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.start-title{font-size:1.7rem;font-weight:500;letter-spacing:-.02em;text-align:center}
+.start-sub{font-size:14px;color:var(--text2);max-width:340px;text-align:center;line-height:1.7}
+#start-btn{
+  padding:15px 44px;border-radius:99px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,#6366f1,#818cf8);
+  color:#fff;font-family:var(--ff);font-size:16px;font-weight:500;
+  box-shadow:0 0 32px rgba(99,102,241,.5);
+  transition:transform .15s,box-shadow .2s,opacity .2s;
+}
+#start-btn:hover:not(:disabled){transform:scale(1.05);box-shadow:0 0 44px rgba(99,102,241,.65)}
+#start-btn:active:not(:disabled){transform:scale(.97)}
+#start-btn:disabled{opacity:.5;cursor:not-allowed}
+.start-pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.s-pill{font-family:var(--ffm);font-size:10px;letter-spacing:.07em;text-transform:uppercase;
+  padding:3px 10px;border-radius:99px;border:1px solid var(--border2);color:var(--text2)}
+
+/* ── Topbar ─────────────────────────────────────────────────── */
+.topbar{
+  flex-shrink:0;display:flex;align-items:center;gap:12px;
+  padding:13px 24px;border-bottom:1px solid var(--border);
+  background:rgba(7,8,12,.92);backdrop-filter:blur(12px);z-index:10;
+}
+.logo{width:30px;height:30px;border-radius:8px;flex-shrink:0;
+  background:linear-gradient(135deg,#6366f1,#818cf8);
+  display:flex;align-items:center;justify-content:center;font-size:15px;
+  box-shadow:0 0 16px rgba(99,102,241,.4)}
+.top-title{font-size:.9rem;font-weight:500;letter-spacing:-.01em}
+.v-chip{font-family:var(--ffm);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  padding:2px 8px;border-radius:99px;background:var(--a-soft);
+  border:1px solid rgba(99,102,241,.28);color:var(--accent)}
+.src-badge{font-family:var(--ffm);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
+  padding:2px 9px;border-radius:99px;border:1px solid;transition:all .3s;display:none}
+.src-badge.intent{display:inline;color:var(--green);border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.07)}
+.src-badge.cache{display:inline;color:var(--teal);border-color:rgba(45,212,191,.3);background:var(--t-soft)}
+.src-badge.llm{display:inline;color:var(--amber);border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.07)}
+.conn-row{margin-left:auto;display:flex;align-items:center;gap:7px;
+  font-family:var(--ffm);font-size:11px;color:var(--text2)}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);
+  transition:background .3s,box-shadow .3s}
+.conn-dot.ok{background:var(--teal);box-shadow:0 0 8px var(--teal)}
+.conn-dot.err{background:var(--red)}
+
+/* ── 3-col main ──────────────────────────────────────────────── */
+.main{flex:1;display:grid;grid-template-columns:1fr 300px 260px;overflow:hidden}
+
+/* ── LEFT ────────────────────────────────────────────────────── */
+.left{display:flex;flex-direction:column;gap:16px;padding:22px 26px;
+  border-right:1px solid var(--border);overflow-y:auto}
+
+/* intro card */
+#intro-card{background:var(--s1);border:1px solid var(--border2);
+  border-left:3px solid var(--accent);border-radius:var(--rsm);
+  padding:14px 18px;display:none}
+.card-label{font-family:var(--ffm);font-size:9px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:9px}
+.intro-line{font-size:13px;color:var(--text2);line-height:1.65;
+  padding:3px 0;border-bottom:1px solid var(--border)}
+.intro-line:last-child{border-bottom:none}
+
+/* branch pill */
+#branch-pill{display:none;align-items:center;gap:7px;width:fit-content;
+  font-family:var(--ffm);font-size:10px;font-weight:500;
+  letter-spacing:.07em;text-transform:uppercase;
+  padding:4px 12px;border-radius:99px;border:1px solid}
+#branch-pill.pos{color:var(--green);border-color:rgba(74,222,128,.25);background:rgba(74,222,128,.07)}
+#branch-pill.neg{color:var(--red);border-color:rgba(248,113,113,.25);background:var(--r-soft)}
+#branch-pill.neu{color:var(--amber);border-color:rgba(251,191,36,.25);background:rgba(251,191,36,.07)}
+
+/* question */
+.q-eyebrow{display:flex;align-items:center;gap:10px;
+  font-family:var(--ffm);font-size:9px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+.q-node{padding:2px 8px;border-radius:99px;background:var(--a-soft);
+  color:var(--accent);font-size:9px}
+#q-text{font-size:clamp(1.3rem,2.5vw,1.85rem);font-weight:400;line-height:1.45;
+  color:var(--text);letter-spacing:-.015em;
+  transition:opacity .25s,transform .25s}
+#q-text.fade{opacity:0;transform:translateY(5px)}
+
+/* waveform */
+.wave-wrap{flex-shrink:0;height:48px;border-radius:var(--rsm);overflow:hidden;
+  background:var(--s1);border:1px solid var(--border);position:relative}
+#waveform{display:block;width:100%;height:100%}
+.wave-lbl{position:absolute;top:7px;left:11px;font-family:var(--ffm);font-size:9px;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--text3);transition:color .3s}
+.wave-lbl.live{color:var(--red)}
+
+/* streaming */
+.stream-block{background:var(--s1);border:1px solid var(--border);
+  border-radius:var(--rsm);padding:0 16px;max-height:0;overflow:hidden;
+  transition:max-height .3s,padding .3s}
+.stream-block.open{max-height:140px;padding:12px 16px}
+.stream-lbl{font-family:var(--ffm);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:5px}
+#stream-text{font-size:13.5px;line-height:1.6;color:var(--text2);white-space:pre-wrap}
+#stream-cursor{display:inline-block;width:2px;height:13px;background:var(--accent);
+  margin-left:2px;vertical-align:middle;animation:blink .85s step-end infinite}
+#stream-cursor.hidden{display:none}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* chat */
+#chat-log{flex:1;display:flex;flex-direction:column;gap:9px;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+#chat-log::-webkit-scrollbar{width:3px}
+#chat-log::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
+.bubble{display:flex;gap:9px;animation:fadeUp .28s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.bubble.bot{flex-direction:row}.bubble.user{flex-direction:row-reverse}
+.b-av{width:27px;height:27px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:12px;margin-top:1px}
+.bubble.bot .b-av{background:var(--a-soft);color:var(--accent)}
+.bubble.user .b-av{background:var(--t-soft);color:var(--teal)}
+.b-body{max-width:82%;background:var(--s2);border:1px solid var(--border);
+  border-radius:var(--rsm);padding:8px 12px;font-size:13px;line-height:1.55}
+.bubble.user .b-body{text-align:right}
+.b-role{font-family:var(--ffm);font-size:9px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--text3);margin-bottom:3px}
+
+#err-toast{display:none;padding:8px 12px;border-radius:var(--rsm);
+  border:1px solid rgba(248,113,113,.3);background:var(--r-soft);
+  font-size:12.5px;color:var(--red)}
+
+/* ── MIDDLE ──────────────────────────────────────────────────── */
+.mid{display:flex;flex-direction:column;gap:16px;padding:20px 20px;
+  border-right:1px solid var(--border);overflow-y:auto}
+.sec-lbl{font-family:var(--ffm);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+.prog-steps{display:flex;gap:5px;margin-bottom:6px}
+.step{flex:1;height:3px;border-radius:99px;background:var(--border2);transition:background .5s}
+.step.done{background:var(--accent)}
+.step.active{background:linear-gradient(90deg,var(--accent),var(--teal));
+  box-shadow:0 0 8px rgba(99,102,241,.4)}
+.prog-names{display:flex;justify-content:space-between;
+  font-family:var(--ffm);font-size:9px;color:var(--text3)}
+.divider{height:1px;background:var(--border);flex-shrink:0}
+
+/* ── MIC BUTTON — click-to-toggle, primary interaction ─────── */
+.mic-section{flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:16px}
+
+#mic-btn{
+  width:88px;height:88px;border-radius:50%;
+  border:2px solid var(--border2);background:var(--s2);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:30px;outline:none;
+  transition:border-color .2s,box-shadow .2s,transform .12s,background .2s;
+  user-select:none;-webkit-user-select:none;
+  /* CRITICAL: make sure pointer events work */
+  pointer-events:all;position:relative;z-index:1;
+}
+#mic-btn:hover:not(:disabled){
+  border-color:rgba(99,102,241,.6);
+  box-shadow:0 0 0 8px var(--a-soft);
+  transform:scale(1.05);
+}
+#mic-btn.recording{
+  border-color:var(--red);background:rgba(248,113,113,.08);
+  box-shadow:0 0 0 10px rgba(248,113,113,.12);
+  animation:rec-ring 1.4s ease-in-out infinite;
+}
+#mic-btn:disabled{opacity:.35;cursor:not-allowed;transform:none!important;
+  box-shadow:none!important}
+@keyframes rec-ring{
+  0%  {box-shadow:0 0 0 6px  rgba(248,113,113,.35)}
+  70% {box-shadow:0 0 0 18px rgba(248,113,113,0)}
+  100%{box-shadow:0 0 0 6px  rgba(248,113,113,0)}
+}
+
+/* hover zone (desktop enhancement — optional on top of click) */
+.mic-hover-ring{
+  position:relative;width:180px;height:180px;border-radius:50%;
+  border:1px dashed var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  transition:border-color .3s,background .3s;
+}
+.mic-hover-ring.hovering{
+  border-color:rgba(248,113,113,.4);
+  background:rgba(248,113,113,.03);
+}
+.mic-hover-ring.hovering::before{
+  content:'';position:absolute;width:192px;height:192px;border-radius:50%;
+  border:1px solid rgba(248,113,113,.2);animation:ripple 1.6s ease-out infinite;
+}
+@keyframes ripple{0%{transform:scale(.94);opacity:.7}100%{transform:scale(1.06);opacity:0}}
+
+.mic-label{font-family:var(--ffm);font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text2);text-align:center;
+  min-height:16px;transition:color .2s}
+.mic-label.active{color:var(--red)}
+.mic-label.ready{color:var(--accent)}
+
+.status-row{display:flex;align-items:center;gap:10px}
+.audio-bars{display:none;align-items:flex-end;gap:3px;height:16px}
+.audio-bars.on{display:flex}
+.audio-bars span{width:3px;border-radius:99px;background:var(--teal);
+  animation:bar .75s ease-in-out infinite}
+.audio-bars span:nth-child(1){height:5px;animation-delay:0s}
+.audio-bars span:nth-child(2){height:10px;animation-delay:.1s}
+.audio-bars span:nth-child(3){height:16px;animation-delay:.2s}
+.audio-bars span:nth-child(4){height:10px;animation-delay:.3s}
+.audio-bars span:nth-child(5){height:5px;animation-delay:.4s}
+@keyframes bar{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+
+#status-line{font-size:12px;color:var(--text2);text-align:center;
+  min-height:18px;transition:color .25s}
+#status-line.active{color:var(--teal)}
+#status-line.error{color:var(--red)}
+
+/* latency */
+.lat-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.lat-card{background:var(--s1);border:1px solid var(--border);
+  border-radius:var(--rsm);padding:9px 11px;transition:border-color .4s}
+.lat-card.lit{border-color:rgba(45,212,191,.3)}
+.lat-key{font-family:var(--ffm);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text3);margin-bottom:3px;transition:color .4s}
+.lat-card.lit .lat-key{color:var(--teal)}
+.lat-val{font-family:var(--ffm);font-size:16px;font-weight:500;
+  color:var(--text3);transition:color .4s}
+.lat-card.lit .lat-val{color:var(--text)}
+.lat-unit{font-size:10px;color:var(--text3);margin-left:1px}
+
+/* ── RIGHT ───────────────────────────────────────────────────── */
+.right{display:flex;flex-direction:column;gap:16px;padding:20px;overflow-y:auto}
+#capture-table{width:100%}
+.cap-row{display:flex;align-items:flex-start;gap:9px;padding:7px 0;
+  border-bottom:1px solid var(--border);font-size:13px}
+.cap-row:last-child{border-bottom:none}
+.cap-key{font-family:var(--ffm);font-size:9.5px;color:var(--text3);
+  letter-spacing:.05em;text-transform:uppercase;min-width:72px;
+  flex-shrink:0;margin-top:2px}
+.cap-val{color:var(--text);word-break:break-word}
+.cap-empty{font-size:12px;color:var(--text3);font-style:italic;padding:6px 0}
+
+/* module explainer */
+.exp-item{background:var(--s1);border:1px solid var(--border);
+  border-radius:var(--rsm);padding:11px 14px;margin-bottom:8px;
+  cursor:pointer;transition:border-color .2s}
+.exp-item:hover{border-color:var(--border2)}
+.exp-header{display:flex;align-items:center;gap:9px}
+.exp-icon{width:28px;height:28px;border-radius:7px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;flex-shrink:0}
+.exp-name{font-size:13px;font-weight:500;flex:1}
+.exp-badge{font-family:var(--ffm);font-size:9px;letter-spacing:.07em;
+  text-transform:uppercase;padding:2px 8px;border-radius:99px;border:1px solid}
+.exp-body{font-size:12.5px;color:var(--text2);line-height:1.65;
+  margin-top:10px;display:none}
+.exp-item.open .exp-body{display:block}
+.exp-stat{font-family:var(--ffm);font-size:10px;color:var(--text3);
+  margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
+
+/* ── Bottombar ───────────────────────────────────────────────── */
+.bottombar{flex-shrink:0;display:flex;align-items:center;gap:12px;
+  padding:8px 24px;border-top:1px solid var(--border);
+  background:rgba(7,8,12,.9);font-family:var(--ffm);font-size:10px;color:var(--text3)}
+
+/* ── Done overlay — also FIXED ───────────────────────────────── */
+#done-overlay{
+  display:none;position:fixed;inset:0;z-index:100;
+  background:rgba(7,8,12,.96);backdrop-filter:blur(18px);
+  flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;padding:24px;
+}
+.done-ring{width:80px;height:80px;border-radius:50%;border:2px solid var(--teal);
+  display:flex;align-items:center;justify-content:center;font-size:34px;
+  box-shadow:0 0 32px var(--t-glow);animation:fadeUp .5s ease}
+.done-title{font-size:1.75rem;font-weight:500;letter-spacing:-.02em;
+  animation:fadeUp .5s .07s both}
+.done-sub{font-size:13.5px;color:var(--text2);max-width:360px;
+  text-align:center;line-height:1.7;animation:fadeUp .5s .14s both}
+#done-capture{background:var(--s1);border:1px solid var(--border2);
+  border-radius:var(--r);padding:16px 22px;width:100%;max-width:460px;
+  animation:fadeUp .5s .21s both}
+.done-cap-title{font-family:var(--ffm);font-size:9.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.done-cap-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px}
+.done-cap-item .dck{font-family:var(--ffm);font-size:9px;color:var(--text3);
+  text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+.done-cap-item .dcv{font-size:13.5px;color:var(--text)}
+#restart-btn{padding:10px 28px;border-radius:99px;background:var(--a-soft);
+  border:1px solid rgba(99,102,241,.3);color:var(--accent);
+  font-family:var(--ff);font-size:14px;cursor:pointer;transition:background .2s;
+  animation:fadeUp .5s .28s both;pointer-events:all}
+#restart-btn:hover{background:var(--a-glow)}
+
+@media(max-width:1000px){.main{grid-template-columns:1fr 300px}.right{display:none}}
+@media(max-width:680px){.main{grid-template-columns:1fr}.mid{border-right:none}}
+</style>
+</head>
+<body>
+
+<!-- ── START OVERLAY (fixed, covers full screen) ──────────────── -->
+<div id="start-overlay">
+  <div class="start-logo">🏦</div>
+  <div class="start-title">L&T Finance Voice Bot</div>
+  <div class="start-sub">Automated payment verification in Hindi/English.<br>Click below — browser needs your click to enable audio.</div>
+  <button id="start-btn" disabled>⏳ Connecting…</button>
+  <div class="start-pills">
+    <span class="s-pill">Groq Whisper</span>
+    <span class="s-pill">Llama 3.1</span>
+    <span class="s-pill">FAISS Cache</span>
+    <span class="s-pill">Intent Classifier</span>
+  </div>
+</div>
+
+<!-- Topbar -->
+<header class="topbar">
+  <div class="logo">🏦</div>
+  <span class="top-title">L&T Finance Voice Bot</span>
+  <span class="v-chip">V3</span>
+  <span class="src-badge" id="src-badge"></span>
+  <div class="conn-row">
+    <div class="conn-dot" id="conn-dot"></div>
+    <span id="conn-label">connecting</span>
+  </div>
+</header>
+
+<!-- Main 3-col -->
+<div class="main">
+
+  <!-- LEFT -->
+  <section class="left">
+    <div id="intro-card">
+      <div class="card-label">About this call</div>
+      <div id="intro-lines"></div>
+    </div>
+    <div id="branch-pill"></div>
+    <div>
+      <div class="q-eyebrow">
+        <span>Current Question</span>
+        <span class="q-node" id="q-node">—</span>
+      </div>
+      <div id="q-text">Starting call…</div>
+    </div>
+    <div class="wave-wrap">
+      <canvas id="waveform"></canvas>
+      <div class="wave-lbl" id="wave-lbl">IDLE</div>
+    </div>
+    <div class="stream-block" id="stream-block">
+      <div class="stream-lbl">Bot responding</div>
+      <div id="stream-text"></div><span id="stream-cursor" class="hidden"></span>
+    </div>
+    <div id="err-toast"></div>
+    <div id="chat-log"></div>
+  </section>
+
+  <!-- MIDDLE -->
+  <section class="mid">
+    <!-- Progress -->
+    <div>
+      <div class="sec-lbl">Call progress</div>
+      <div class="prog-steps">
+        <div class="step active" id="step-1"></div>
+        <div class="step"        id="step-2"></div>
+        <div class="step"        id="step-3"></div>
+        <div class="step"        id="step-4"></div>
+        <div class="step"        id="step-5"></div>
+      </div>
+      <div class="prog-names">
+        <span>Avail</span><span>Payment</span><span>Details</span><span>Amount</span><span>Done</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Mic — click to start/stop -->
+    <div class="mic-section">
+      <div class="mic-hover-ring" id="mic-hover-ring">
+        <button id="mic-btn" disabled title="Click to speak">🎙</button>
+      </div>
+      <div class="mic-label" id="mic-label">waiting for call…</div>
+      <div class="status-row">
+        <div class="audio-bars" id="audio-bars">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div id="status-line">Connecting…</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Latency -->
+    <div>
+      <div class="sec-lbl" style="margin-bottom:10px">Latency · last turn</div>
+      <div class="lat-grid">
+        <div class="lat-card" id="lat-stt"><div class="lat-key">STT</div><div class="lat-val" id="lv-stt">—</div></div>
+        <div class="lat-card" id="lat-via"><div class="lat-key">Via</div><div class="lat-val" id="lv-via" style="font-size:12px">—</div></div>
+        <div class="lat-card" id="lat-tts"><div class="lat-key">TTS</div><div class="lat-val" id="lv-tts">—</div></div>
+        <div class="lat-card" id="lat-tot"><div class="lat-key">Total</div><div class="lat-val" id="lv-tot">—</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT -->
+  <section class="right">
+    <div>
+      <div class="sec-lbl" style="margin-bottom:10px">Captured data</div>
+      <div id="capture-table">
+        <div class="cap-empty" id="cap-empty">No data captured yet</div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="sec-lbl" style="margin-bottom:6px">How each module works</div>
+
+    <div class="exp-item" onclick="this.classList.toggle('open')">
+      <div class="exp-header">
+        <div class="exp-icon" style="background:rgba(45,212,191,.12);color:var(--teal)">🎤</div>
+        <span class="exp-name">STT — Groq Whisper</span>
+        <span class="exp-badge" style="color:var(--teal);border-color:rgba(45,212,191,.3);background:var(--t-soft)">300-700ms</span>
+      </div>
+      <div class="exp-body">
+        Converts your voice to text. Records WebM/Opus audio in 100ms chunks, assembles them when you stop, and sends the file to Groq Whisper Large-v3-Turbo (216× real-time). From India, the network round-trip adds ~300–700ms unavoidably. Supports Hindi natively — set <code>STT_LANGUAGE=hi</code> in .env.<br><br>
+        <b>Key fix:</b> Browsers write the WebM file header only on the first chunk. A headerless blob causes a 400 error from any STT API. AudioCollector scans each chunk for magic bytes (1A 45 DF A3) and drops pre-header data.
+        <div class="exp-stat" id="exp-stt-stat">Last: —</div>
+      </div>
+    </div>
+
+    <div class="exp-item" onclick="this.classList.toggle('open')">
+      <div class="exp-header">
+        <div class="exp-icon" style="background:rgba(74,222,128,.1);color:var(--green)">⚡</div>
+        <span class="exp-name">Intent Classifier</span>
+        <span class="exp-badge" style="color:var(--green);border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.08)">&lt;1ms</span>
+      </div>
+      <div class="exp-body">
+        Catches simple answers before any AI is called. Regex patterns match "haan/yes/ji" → YES, "nahi/no" → NO, "15 April" → DATE, "UPI/GPay" → METHOD, "5000/₹5k" → AMOUNT. Handles 70%+ of turns in a payment call with zero network cost.<br><br>
+        <b>Auto-advance nodes:</b> PURPOSE, CALLBACK, CAPTURE_EXEC advance on ANY answer — no branching, so the classifier always handles them instantly.
+        <div class="exp-stat" id="exp-intent-stat">Hits this session: 0</div>
+      </div>
+    </div>
+
+    <div class="exp-item" onclick="this.classList.toggle('open')">
+      <div class="exp-header">
+        <div class="exp-icon" style="background:rgba(45,212,191,.1);color:var(--teal)">🔮</div>
+        <span class="exp-name">Semantic Cache</span>
+        <span class="exp-badge" style="color:var(--teal);border-color:rgba(45,212,191,.3);background:var(--t-soft)">FAISS ~5ms</span>
+      </div>
+      <div class="exp-body">
+        Stores LLM responses and reuses them for similar future answers. Encodes answers into 384-dim vectors (MiniLM model) stored in FAISS. On lookup, finds nearest vector by cosine similarity. If ≥ 0.85 similarity → cache hit, no LLM needed.<br><br>
+        "haan bilkul", "ji haan", "ho gaya payment" all map to the same vector cluster — something a key-value cache would miss.
+        <div class="exp-stat" id="exp-cache-stat">Hits / Misses: 0 / 0</div>
+      </div>
+    </div>
+
+    <div class="exp-item" onclick="this.classList.toggle('open')">
+      <div class="exp-header">
+        <div class="exp-icon" style="background:rgba(251,191,36,.1);color:var(--amber)">🧠</div>
+        <span class="exp-name">LLM — Groq Llama 3.1</span>
+        <span class="exp-badge" style="color:var(--amber);border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.08)">~1300ms</span>
+      </div>
+      <div class="exp-body">
+        Generates natural Hinglish acknowledgements for free-text answers (REASON, CAPTURE_EXEC). Only called when intent classifier AND cache both miss. Tokens stream live to the UI. Each completed sentence fires TTS immediately — first audio arrives ~300ms earlier than waiting for the full response.
+        <div class="exp-stat" id="exp-llm-stat">Calls this session: 0</div>
+      </div>
+    </div>
+
+    <div class="exp-item" onclick="this.classList.toggle('open')">
+      <div class="exp-header">
+        <div class="exp-icon" style="background:rgba(99,102,241,.12);color:var(--accent)">🔊</div>
+        <span class="exp-name">TTS — gTTS Cached</span>
+        <span class="exp-badge" style="color:var(--accent);border-color:rgba(99,102,241,.3);background:var(--a-soft)">&lt;10ms cached</span>
+      </div>
+      <div class="exp-body">
+        Converts bot text to MP3 audio. All fixed survey questions are pre-synthesised at startup (warm-up), so they always hit the cache in &lt;10ms. The LLM ack text misses on first call (~800ms), then gets cached. Two separate TTS calls per turn: ack (miss) + question (hit) — combined is faster than one merged call because the merged string never matches the cache.
+        <div class="exp-stat" id="exp-tts-stat">Last: —</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Bottombar -->
+<div class="bottombar">
+  <span>Groq Whisper · Llama 3.1 · FAISS · Intent Classifier · gTTS</span>
+  <span style="margin-left:auto">Hindi/Hinglish · L&T Finance · V3</span>
+</div>
+
+<!-- Done overlay (fixed) -->
+<div id="done-overlay">
+  <div class="done-ring">✓</div>
+  <div class="done-title">Call Complete</div>
+  <div class="done-sub">Payment verification recorded. Your responses have been captured.</div>
+  <div id="done-capture">
+    <div class="done-cap-title">Captured Information</div>
+    <div class="done-cap-grid" id="done-cap-grid"></div>
+  </div>
+  <button id="restart-btn">↺ New Call</button>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────
+const WS_URL = `ws://${location.host}/ws`;
+const NODE_STEP = {
+  INTRO:1,AVAILABILITY:1,CALLBACK:1,PURPOSE:2,PAYMENT_CHECK:2,
+  WHO_PAID:3,CAPTURE_PAYER:3,DATE:3,METHOD:4,AMOUNT:4,
+  REASON:3,CAPTURE_EXEC:3,CLOSE:5
+};
+const CAP_LABELS = {
+  payment_date:'Date',payment_amount:'Amount',payment_method:'Method',
+  payer:'Payer',payer_name:'Payer Name',nonpayment_reason:'Reason',exec_contact:'Contact'
+};
+const MIN_HOLD = 400;  // ms — minimum recording time
+const CHUNK_MS = 100;
+
+// ── State ─────────────────────────────────────────────────────
+let ws=null, mediaRec=null;
+let isRecording=false, isBusy=false, isDone=false, serverReady=false;
+let recStart=0;
+let audioQueue=[], pendingBlobs=[], audioPlaying=false;
+let streamTxt='', latSttMs=null;
+let audioCtx=null, analyser=null, waveRAF=null;
+// Stats
+let intentHits=0, cacheHits=0, cacheMisses=0, llmCalls=0;
+let lastSttMs=0, lastTtsMs=0;
+
+// ── DOM ───────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const startOverlay = $('start-overlay');
+const startBtn     = $('start-btn');
+const connDot      = $('conn-dot');
+const connLabel    = $('conn-label');
+const srcBadge     = $('src-badge');
+const qText        = $('q-text');
+const qNode        = $('q-node');
+const introCard    = $('intro-card');
+const introLines   = $('intro-lines');
+const branchPill   = $('branch-pill');
+const waveCvs      = $('waveform');
+const waveLbl      = $('wave-lbl');
+const streamBlock  = $('stream-block');
+const streamEl     = $('stream-text');
+const streamCur    = $('stream-cursor');
+const chatLog      = $('chat-log');
+const errToast     = $('err-toast');
+const micBtn       = $('mic-btn');
+const micHoverRing = $('mic-hover-ring');
+const micLabel     = $('mic-label');
+const audioBars    = $('audio-bars');
+const statusLine   = $('status-line');
+const doneOverlay  = $('done-overlay');
+const restartBtn   = $('restart-btn');
+const capTable     = $('capture-table');
+const capEmpty     = $('cap-empty');
+const steps        = [1,2,3,4,5].map(i => $(`step-${i}`));
+
+// ── Helpers ───────────────────────────────────────────────────
+function setStatus(msg, cls='') {
+  statusLine.textContent = msg;
+  statusLine.className   = cls;
+}
+function setConn(s) {
+  connDot.className    = 'conn-dot' + (s==='ok' ? ' ok' : s==='err' ? ' err' : '');
+  connLabel.textContent = s==='ok' ? 'connected' : s==='err' ? 'error' : 'connecting';
+}
+function showError(msg, auto=true) {
+  errToast.textContent   = '⚠  ' + msg;
+  errToast.style.display = 'block';
+  if (auto) setTimeout(() => { errToast.style.display='none'; }, 5000);
+}
+function setStep(node) {
+  const active = NODE_STEP[node] || 1;
+  steps.forEach((el,i) => {
+    el.className = 'step';
+    if (i+1 < active)       el.classList.add('done');
+    else if (i+1 === active) el.classList.add('active');
+  });
+}
+function setSrc(source) {
+  const labels = {intent:'⚡ Intent', cache:'🔮 Cache', llm:'🧠 LLM'};
+  srcBadge.className    = 'src-badge ' + (source||'');
+  srcBadge.textContent  = labels[source] || '';
+  if (source==='intent') { intentHits++; }
+  else if (source==='cache') { cacheHits++; }
+  else if (source==='llm')   { llmCalls++; }
+  updateStats();
+}
+function setBranch(node) {
+  const map = {
+    WHO_PAID:['pos','✓ Payment confirmed'], REASON:['neg','✗ Payment pending'],
+    DATE:['pos','📅 Collecting details'],   METHOD:['pos','💳 Method'],
+    AMOUNT:['pos','₹ Amount'],             CALLBACK:['neu','📞 Callback'],
+  };
+  if (!map[node]) { branchPill.style.display='none'; return; }
+  const [cls,label] = map[node];
+  branchPill.className  = cls;
+  branchPill.textContent = label;
+  branchPill.style.display = 'flex';
+}
+function setQuestion(text, node) {
+  qText.classList.add('fade');
+  setTimeout(() => {
+    qText.textContent = text;
+    qNode.textContent = node;
+    qText.classList.remove('fade');
+    setStep(node);
+    setBranch(node);
+  }, 250);
+}
+function showIntro(lines) {
+  introLines.innerHTML = '';
+  lines.forEach(l => {
+    const d = document.createElement('div');
+    d.className   = 'intro-line';
+    d.textContent = l;
+    introLines.appendChild(d);
+  });
+  introCard.style.display = 'block';
+}
+
+// ── Mic state ─────────────────────────────────────────────────
+function setMicReady() {
+  micBtn.disabled      = false;
+  micBtn.className     = '';
+  micBtn.textContent   = '🎙';
+  micLabel.textContent = 'click to speak';
+  micLabel.className   = 'mic-label ready';
+}
+function setMicRecording() {
+  micBtn.disabled      = false;
+  micBtn.className     = 'recording';
+  micBtn.textContent   = '⏹';
+  micLabel.textContent = 'click to stop';
+  micLabel.className   = 'mic-label active';
+}
+function setMicBusy() {
+  micBtn.disabled      = true;
+  micBtn.className     = '';
+  micBtn.textContent   = '⏳';
+  micLabel.textContent = 'processing…';
+  micLabel.className   = 'mic-label';
+}
+function setMicWaiting() {
+  micBtn.disabled      = true;
+  micBtn.className     = '';
+  micBtn.textContent   = '🎙';
+  micLabel.textContent = 'waiting for call…';
+  micLabel.className   = 'mic-label';
+}
+
+// ── Bubbles ───────────────────────────────────────────────────
+function addBubble(role, text) {
+  const wrap = document.createElement('div');
+  const av   = document.createElement('div');
+  const body = document.createElement('div');
+  const lbl  = document.createElement('div');
+  const cnt  = document.createElement('div');
+  wrap.className  = `bubble ${role}`;
+  av.className    = 'b-av';
+  body.className  = 'b-body';
+  lbl.className   = 'b-role';
+  av.textContent  = role==='bot' ? '🤖' : '🎙';
+  lbl.textContent = role==='bot' ? 'Bot' : 'You';
+  cnt.textContent = text;
+  body.append(lbl, cnt);
+  wrap.append(av, body);
+  chatLog.append(wrap);
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+// ── Stream ────────────────────────────────────────────────────
+function openStream() {
+  streamTxt = '';
+  streamEl.textContent = '';
+  streamCur.classList.remove('hidden');
+  streamBlock.classList.add('open');
+}
+function appendToken(t) { streamTxt += t; streamEl.textContent = streamTxt; }
+function closeStream() {
+  streamCur.classList.add('hidden');
+  if (streamTxt.trim()) addBubble('bot', streamTxt.trim());
+  streamTxt = '';
+  streamEl.textContent = '';
+  streamBlock.classList.remove('open');
+}
+
+// ── Latency ───────────────────────────────────────────────────
+function setLat(id, val, unit='ms') {
+  const card = $(id);
+  card.classList.add('lit');
+  $('lv-' + id.replace('lat-','')).innerHTML = `${val}<span class="lat-unit">${unit}</span>`;
+}
+function resetLat() {
+  ['lat-stt','lat-via','lat-tts','lat-tot'].forEach(id => {
+    $(id).classList.remove('lit');
+    $('lv-' + id.replace('lat-','')).innerHTML = '—';
+  });
+}
+
+// ── Stats panel ───────────────────────────────────────────────
+function updateStats() {
+  $('exp-stt-stat').textContent    = lastSttMs ? `Last: ${lastSttMs}ms` : 'Last: —';
+  $('exp-intent-stat').textContent = `Hits this session: ${intentHits}`;
+  $('exp-cache-stat').textContent  = `Hits / Misses: ${cacheHits} / ${cacheMisses}`;
+  $('exp-llm-stat').textContent    = `Calls this session: ${llmCalls}`;
+  $('exp-tts-stat').textContent    = lastTtsMs ? `Last: ${lastTtsMs}ms` : 'Last: —';
+}
+
+// ── Data capture ──────────────────────────────────────────────
+function updateCapture(data) {
+  const entries = Object.entries(data).filter(([k]) => CAP_LABELS[k]);
+  if (!entries.length) return;
+  capEmpty.style.display = 'none';
+  capTable.innerHTML = '';
+  entries.forEach(([k,v]) => {
+    const row = document.createElement('div');
+    row.className  = 'cap-row';
+    row.innerHTML  = `<span class="cap-key">${CAP_LABELS[k]}</span><span class="cap-val">${v}</span>`;
+    capTable.appendChild(row);
+  });
+}
+function renderDoneCapture(data) {
+  const grid = $('done-cap-grid');
+  grid.innerHTML = '';
+  const entries = Object.entries(data).filter(([k]) => CAP_LABELS[k]);
+  if (!entries.length) {
+    grid.innerHTML = '<span style="color:var(--text2);font-size:13px">No structured data captured.</span>';
+    return;
+  }
+  entries.forEach(([k,v]) => {
+    const item = document.createElement('div');
+    item.className = 'done-cap-item';
+    item.innerHTML = `<div class="dck">${CAP_LABELS[k]}</div><div class="dcv">${v}</div>`;
+    grid.appendChild(item);
+  });
+}
+
+// ── Audio queue ───────────────────────────────────────────────
+function sealAudio() {
+  if (!audioQueue.length) return;
+  const total  = audioQueue.reduce((n,c) => n+c.length, 0);
+  const merged = new Uint8Array(total);
+  let off = 0;
+  for (const c of audioQueue) { merged.set(c, off); off += c.length; }
+  audioQueue = [];
+  pendingBlobs.push(new Blob([merged.buffer], {type:'audio/mpeg'}));
+  if (!audioPlaying) playNext();
+}
+function playNext() {
+  if (!pendingBlobs.length) {
+    audioPlaying = false;
+    audioBars.classList.remove('on');
+    return;
+  }
+  audioPlaying = true;
+  audioBars.classList.add('on');
+  const blob = pendingBlobs.shift();
+  const url  = URL.createObjectURL(blob);
+  const a    = new Audio(url);
+  a.onended = () => { URL.revokeObjectURL(url); playNext(); };
+  a.onerror = () => { URL.revokeObjectURL(url); playNext(); };
+  a.play().catch(e => { console.warn('Audio play error:', e); URL.revokeObjectURL(url); playNext(); });
+}
+
+// ── Waveform ──────────────────────────────────────────────────
+function startWave(stream) {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser  = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+  audioCtx.createMediaStreamSource(stream).connect(analyser);
+  waveLbl.textContent = 'RECORDING';
+  waveLbl.classList.add('live');
+  drawWave();
+}
+function stopWave() {
+  if (waveRAF) { cancelAnimationFrame(waveRAF); waveRAF=null; }
+  if (audioCtx) { audioCtx.close(); audioCtx=null; analyser=null; }
+  waveCvs.getContext('2d').clearRect(0, 0, waveCvs.width, waveCvs.height);
+  waveLbl.textContent = 'IDLE';
+  waveLbl.classList.remove('live');
+}
+function drawWave() {
+  const ctx = waveCvs.getContext('2d');
+  const W = waveCvs.offsetWidth, H = waveCvs.offsetHeight;
+  waveCvs.width = W; waveCvs.height = H;
+  const buf = new Uint8Array(analyser.frequencyBinCount);
+  const frame = () => {
+    waveRAF = requestAnimationFrame(frame);
+    analyser.getByteTimeDomainData(buf);
+    ctx.clearRect(0,0,W,H);
+    ctx.beginPath(); ctx.strokeStyle='#f87171'; ctx.lineWidth=1.8;
+    const step = W / buf.length;
+    buf.forEach((v,i) => {
+      const y = ((v/128)-1)*(H*.42)+H/2;
+      i===0 ? ctx.moveTo(0,y) : ctx.lineTo(i*step, y);
+    });
+    ctx.stroke();
+  };
+  frame();
+}
+
+// ── Recording ─────────────────────────────────────────────────
+async function startRecording() {
+  if (isBusy || isRecording || isDone) return;
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({audio:true, video:false});
+  } catch {
+    showError('Microphone access denied — allow in browser settings.', false);
+    setMicReady();
+    return;
+  }
+  startWave(stream);
+  const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus']
+    .find(m => MediaRecorder.isTypeSupported(m)) || '';
+  mediaRec = new MediaRecorder(stream, mimeType ? {mimeType} : {});
+  mediaRec.ondataavailable = async ev => {
+    if (ev.data.size < 100) return;
+    const buf = await ev.data.arrayBuffer();
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    wsSend({type:'audio_chunk', data:b64});
+  };
+  mediaRec.start(CHUNK_MS);
+  isRecording = true;
+  recStart    = Date.now();
+  setMicRecording();
+  setStatus('Recording… click ⏹ to send', 'active');
+}
+
+async function stopRecording() {
+  if (!isRecording) return;
+  const held = Date.now() - recStart;
+  isRecording = false;
+  stopWave();
+
+  if (held < MIN_HOLD) {
+    if (mediaRec) { mediaRec.stop(); mediaRec.stream.getTracks().forEach(t=>t.stop()); mediaRec=null; }
+    setMicReady();
+    setStatus('Hold longer while speaking', 'error');
+    setTimeout(() => setStatus('Click to speak'), 2000);
+    return;
+  }
+
+  isBusy = true;
+  setMicBusy();
+  setStatus('Transcribing…', 'active');
+  resetLat(); latSttMs = null;
+
+  mediaRec.stop();
+  mediaRec.stream.getTracks().forEach(t => t.stop());
+  mediaRec = null;
+
+  // Allow last ondataavailable chunk to flush before sending audio_end
+  await new Promise(r => setTimeout(r, 180));
+  wsSend({type:'audio_end'});
+}
+
+// ── Mic button: click to start, click again to stop ──────────
+micBtn.addEventListener('click', () => {
+  if (isDone || !serverReady) return;
+  if (isRecording) {
+    stopRecording();
+  } else if (!isBusy) {
+    startRecording();
+  }
+});
+
+// ── Optional hover enhancement (desktop) ─────────────────────
+// Only activates when mic is in ready state (not busy/recording)
+micHoverRing.addEventListener('mouseenter', () => {
+  if (!isBusy && !isRecording && !isDone && serverReady)
+    micHoverRing.classList.add('hovering');
+});
+micHoverRing.addEventListener('mouseleave', () => {
+  micHoverRing.classList.remove('hovering');
+});
+
+// ── WebSocket ─────────────────────────────────────────────────
+function wsSend(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN)
+    ws.send(JSON.stringify(obj));
+}
+
+function handleMsg(msg) {
+  switch (msg.type) {
+
+    case 'server_ready':
+      serverReady = true;
+      startBtn.textContent = '🎙 Start Call';
+      startBtn.disabled    = false;
+      break;
+
+    case 'intro_text':
+      showIntro(msg.lines);
+      break;
+
+    case 'stt_done':
+      latSttMs = msg.ms; lastSttMs = msg.ms;
+      setLat('lat-stt', msg.ms);
+      updateStats();
+      break;
+
+    case 'transcript_final':
+      addBubble('user', msg.text);
+      openStream();
+      setStatus('Processing…', 'active');
+      break;
+
+    case 'llm_token':
+      appendToken(msg.text);
+      break;
+
+    case 'audio_chunk': {
+      const bytes = Uint8Array.from(atob(msg.data), c => c.charCodeAt(0));
+      audioQueue.push(bytes);
+      break;
+    }
+
+    case 'audio_ready':
+      sealAudio();
+      break;
+
+    case 'next_question':
+      closeStream();
+      if (msg.node !== 'INTRO' && msg.node !== 'AVAILABILITY')
+        introCard.style.display = 'none';
+      setQuestion(msg.text, msg.node);
+      setSrc(msg.source || '');
+      isBusy = false;
+      setMicReady();
+      setStatus('Click 🎙 to speak');
+      if (msg.latency) {
+        if (msg.latency.tts)  { lastTtsMs = msg.latency.tts; setLat('lat-tts', msg.latency.tts); }
+        if (msg.latency.total) setLat('lat-tot', msg.latency.total + (latSttMs||0));
+      }
+      if (msg.source) {
+        const via = {intent:'⚡ Instant', cache:'🔮 Cache', llm:'🧠 LLM'};
+        setLat('lat-via', via[msg.source] || msg.source, '');
+      }
+      if (msg.capture) updateCapture(msg.capture);
+      updateStats();
+      break;
+
+    case 'survey_done':
+      closeStream();
+      if (msg.capture) { updateCapture(msg.capture); renderDoneCapture(msg.capture); }
+      showDone(msg.capture || {});
+      break;
+
+    case 'error':
+      showError(msg.message || 'Something went wrong');
+      isBusy = false;
+      setMicReady();
+      setStatus('Click 🎙 to speak');
+      break;
+  }
+}
+
+function connect() {
+  ws = new WebSocket(WS_URL);
+  ws.onopen = () => {
+    setConn('ok');
+    setStatus('Ready — click Start Call');
+  };
+  ws.onmessage = e => {
+    try { handleMsg(JSON.parse(e.data)); } catch(err) { console.error(err); }
+  };
+  ws.onclose = () => {
+    setConn('err');
+    serverReady = false;
+    startBtn.textContent = '⏳ Reconnecting…';
+    startBtn.disabled    = true;
+    setMicWaiting();
+    setStatus('Disconnected — reconnecting…', 'error');
+    setTimeout(connect, 2000);
+  };
+  ws.onerror = () => setConn('err');
+}
+
+// ── Start Call button ─────────────────────────────────────────
+startBtn.addEventListener('click', () => {
+  if (!serverReady) return;
+  startOverlay.classList.add('hidden');
+  setMicWaiting();
+  setStatus('Loading call…');
+  wsSend({type:'start_call'});
+});
+
+// ── Done / restart ────────────────────────────────────────────
+function showDone(capture) {
+  isDone = true;
+  steps.forEach(s => { s.className = 'step done'; });
+  doneOverlay.style.display = 'flex';
+  audioBars.classList.remove('on');
+}
+
+restartBtn.addEventListener('click', () => {
+  isDone = false; isBusy = false; isRecording = false;
+  audioQueue = []; pendingBlobs = []; audioPlaying = false;
+  streamTxt  = ''; streamEl.textContent = '';
+  streamBlock.classList.remove('open');
+  chatLog.innerHTML    = '';
+  errToast.style.display = 'none';
+  audioBars.classList.remove('on');
+  branchPill.style.display = 'none';
+  introCard.style.display  = 'none';
+  capTable.innerHTML = '';
+  capTable.appendChild(capEmpty);
+  capEmpty.style.display = 'block';
+  doneOverlay.style.display = 'none';
+  intentHits=0; cacheHits=0; cacheMisses=0; llmCalls=0;
+  lastSttMs=0; lastTtsMs=0;
+  updateStats(); resetLat();
+  setMicWaiting(); setStatus('Restarting…');
+  wsSend({type:'start_session'});
+});
+
+// ── Boot ──────────────────────────────────────────────────────
+setMicWaiting();
+connect();
+</script>
+</body>
+</html>
